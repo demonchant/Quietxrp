@@ -406,22 +406,50 @@ let lastBtcSignalState=false;
 // ═══════════════════════════════════════════════════
 // BINANCE API — fallback chain
 // ═══════════════════════════════════════════════════
-const BINANCE_ENDPOINTS=['https://api.binance.com/api/v3','https://api1.binance.com/api/v3','https://api2.binance.com/api/v3'];
-let activeEndpoint=BINANCE_ENDPOINTS[0];
+// Binance endpoint chain — direct first, then CORS proxies as fallback
+// Proxies handle regional blocks (some countries/carriers block Binance directly)
+const BINANCE_DIRECT=[
+  'https://api.binance.com/api/v3',
+  'https://api1.binance.com/api/v3',
+  'https://api2.binance.com/api/v3',
+  'https://api3.binance.com/api/v3',
+];
+// CORS proxy wrappers — encode the full Binance URL for each
+const PROXY_BASE='https://api.allorigins.win/raw?url=';
+const PROXY_BASE2='https://corsproxy.io/?';
+let activeEndpoint=BINANCE_DIRECT[0];
+let useProxy=false;
 
 async function binanceFetch(path){
-  const ordered=[activeEndpoint,...BINANCE_ENDPOINTS.filter(e=>e!==activeEndpoint)];
+  // Try direct endpoints first
+  if(!useProxy){
+    for(const base of BINANCE_DIRECT){
+      try{
+        const r=await fetch(base+path,{signal:AbortSignal.timeout(7000)});
+        if(!r.ok) throw new Error('HTTP '+r.status);
+        const data=await r.json();
+        if(base!==activeEndpoint){ activeEndpoint=base; }
+        return data;
+      }catch(e){}
+    }
+    // All direct failed — switch to proxy mode
+    useProxy=true;
+    addAlert('Direct Binance blocked — switching to proxy mode','warn','NET');
+  }
+
+  // Proxy fallback — wrap the Binance URL
+  const fullUrl=encodeURIComponent('https://api.binance.com/api/v3'+path);
+  const proxies=[PROXY_BASE+fullUrl, PROXY_BASE2+fullUrl];
   let lastErr;
-  for(const base of ordered){
+  for(const url of proxies){
     try{
-      const r=await fetch(base+path,{signal:AbortSignal.timeout(8000)});
+      const r=await fetch(url,{signal:AbortSignal.timeout(10000)});
       if(!r.ok) throw new Error('HTTP '+r.status);
       const data=await r.json();
-      if(base!==activeEndpoint){ activeEndpoint=base; addAlert('Switched Binance endpoint: '+base.split('//')[1].split('/')[0],'info','NET'); }
       return data;
     }catch(e){ lastErr=e; }
   }
-  throw new Error('All Binance endpoints failed: '+lastErr?.message);
+  throw new Error('All endpoints failed (direct + proxy): '+lastErr?.message);
 }
 
 function parseKlines(raw){ return raw.map(c=>({t:c[0],o:parseFloat(c[1]),h:parseFloat(c[2]),l:parseFloat(c[3]),c:parseFloat(c[4]),v:parseFloat(c[5])})); }
@@ -864,7 +892,22 @@ async function fetchAndRender(){
 // ═══════════════════════════════════════════════════
 // WEBSOCKET — live price every ~1s
 // ═══════════════════════════════════════════════════
-let wsReconnectTimer=null, lastTickTime=0;
+let wsReconnectTimer=null, lastTickTime=0, wsFailCount=0, wsFallbackInterval=null;
+
+function startPriceFallback(){
+  // If WebSocket keeps failing, poll price via the same proxy fetch every 3s
+  if(wsFallbackInterval) return;
+  addAlert('WebSocket unavailable — falling back to price polling every 3s','warn','WS');
+  wsFallbackInterval=setInterval(async()=>{
+    try{
+      const t=await fetchTicker('XRPUSDT');
+      const price=parseFloat(t.lastPrice), open=parseFloat(t.openPrice);
+      updatePriceTick(price,((price-open)/open)*100,parseFloat(t.highPrice),parseFloat(t.lowPrice));
+      const bt=await fetchTicker('BTCUSDT');
+      document.getElementById('btcPrice').textContent='$'+parseFloat(bt.lastPrice).toLocaleString('en-US',{maximumFractionDigits:0});
+    }catch(e){}
+  },3000);
+}
 
 function updatePriceTick(price,chgPct,high,low){
   currentPrice=price;
@@ -895,6 +938,8 @@ function startWebSocket(){
     addAlert('⚡ WebSocket connected — price live every ~1s','info','WS');
     const dot=document.getElementById('wsDot');
     if(dot) dot.style.background='var(--bull2)';
+    wsFailCount=0;
+    if(wsFallbackInterval){ clearInterval(wsFallbackInterval); wsFallbackInterval=null; }
     if(wsReconnectTimer){clearTimeout(wsReconnectTimer);wsReconnectTimer=null;}
   };
   ws.onmessage=(evt)=>{
@@ -911,7 +956,13 @@ function startWebSocket(){
   ws.onerror=()=>{ const dot=document.getElementById('wsDot'); if(dot){dot.style.background='var(--bear2)';dot.style.boxShadow='0 0 8px var(--bear2)';} };
   ws.onclose=()=>{
     const dot=document.getElementById('wsDot'); if(dot){dot.style.background='var(--amber)';dot.style.boxShadow='0 0 8px var(--amber)';}
-    wsReconnectTimer=setTimeout(()=>{addAlert('WebSocket reconnecting...','warn','WS');startWebSocket();},3000);
+    wsFailCount++;
+    if(wsFailCount>=3){
+      // WebSocket failing repeatedly — start price polling fallback
+      startPriceFallback();
+    } else {
+      wsReconnectTimer=setTimeout(()=>{addAlert('WebSocket reconnecting...','warn','WS');startWebSocket();},3000);
+    }
   };
 }
 
