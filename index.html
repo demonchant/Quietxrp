@@ -207,6 +207,7 @@ body::before{content:'';position:fixed;inset:0;background:repeating-linear-gradi
 <nav class="tabs">
   <button class="tab-btn active" data-tab="monitor">Monitor</button>
   <button class="tab-btn" data-tab="backtest">Backtest</button>
+  <button class="tab-btn" data-tab="history">History</button>
 </nav>
 
 <!-- MONITOR TAB -->
@@ -347,6 +348,46 @@ body::before{content:'';position:fixed;inset:0;background:repeating-linear-gradi
     </div>
   </div>
 </div><!-- /backtest -->
+
+<!-- HISTORY TAB -->
+<div class="content" id="tab-history">
+
+  <!-- SUMMARY STATS ROW -->
+  <div id="histSummary" style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:14px;">
+    <div class="stat-card"><div class="stat-label">Signals Fired</div><div class="stat-value blue" id="hStatSignals">0</div><div class="stat-sub">since recording started</div></div>
+    <div class="stat-card"><div class="stat-label">Trades Logged</div><div class="stat-value blue" id="hStatTrades">0</div><div class="stat-sub">locked entries</div></div>
+    <div class="stat-card"><div class="stat-label">Live Win Rate</div><div class="stat-value green" id="hStatWR">—</div><div class="stat-sub">closed trades only</div></div>
+    <div class="stat-card"><div class="stat-label">Avg Hold Time</div><div class="stat-value amber" id="hStatAvgHold">—</div><div class="stat-sub">hours per trade</div></div>
+  </div>
+
+  <!-- CONTROLS -->
+  <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:14px;">
+    <select id="histFilter" onchange="renderHistory()" style="background:var(--bg3);border:1px solid var(--border2);color:var(--text);padding:6px 12px;border-radius:5px;font-family:var(--mono);font-size:.75rem;outline:none;">
+      <option value="all">All Events</option>
+      <option value="signal">Signals Only</option>
+      <option value="trade">Trades Only</option>
+      <option value="outcome">Closed Trades</option>
+    </select>
+    <button onclick="exportHistoryCSV()" style="padding:6px 16px;background:var(--bg3);border:1px solid var(--border2);color:var(--blue2);border-radius:5px;font-family:var(--mono);font-size:.75rem;cursor:pointer;">↓ Export CSV</button>
+    <button onclick="clearHistory()" style="padding:6px 16px;background:var(--bg3);border:1px solid var(--border);color:var(--bear2);border-radius:5px;font-family:var(--mono);font-size:.75rem;cursor:pointer;">✕ Clear History</button>
+    <span id="histStorageInfo" style="font-size:.65rem;color:var(--text3);margin-left:auto;"></span>
+  </div>
+
+  <!-- INSIGHT PANEL -->
+  <div id="histInsight" style="display:none;background:var(--bg2);border:1px solid var(--border);border-radius:8px;padding:14px;margin-bottom:14px;">
+    <div style="font-size:.62rem;color:var(--text3);text-transform:uppercase;letter-spacing:1px;margin-bottom:10px;">Pattern Insights — based on recorded history</div>
+    <div id="histInsightContent" style="display:grid;grid-template-columns:1fr 1fr;gap:10px;font-size:.72rem;"></div>
+  </div>
+
+  <!-- EVENT LOG -->
+  <div class="panel">
+    <div class="panel-title">Event Log <span id="histCount" style="color:var(--text3);font-weight:400;font-size:.65rem;text-transform:none;letter-spacing:0;"></span></div>
+    <div id="histLog" style="display:flex;flex-direction:column;gap:6px;max-height:500px;overflow-y:auto;">
+      <div style="color:var(--text3);text-align:center;padding:30px;font-size:.75rem;">No history yet. Events will be recorded automatically as the monitor runs.</div>
+    </div>
+  </div>
+
+</div><!-- /history -->
 
 </div><!-- /shell -->
 
@@ -1182,8 +1223,429 @@ function drawEquityCurve(pts){
 }
 
 // ═══════════════════════════════════════════════════
-// TAB SWITCHING
+// HISTORY ENGINE
+// Records signals, trade locks, outcomes and KDJ
+// snapshots using persistent localStorage storage.
+// Builds pattern insights over time.
 // ═══════════════════════════════════════════════════
+
+const HIST_KEY = 'kdj_history_v1';
+const SNAP_KEY = 'kdj_snapshots_v1';
+const MAX_EVENTS = 2000;   // max event log entries
+const MAX_SNAPS  = 5000;   // max KDJ snapshots
+
+// ── Load / Save ──
+function histLoad(){ try{ return JSON.parse(localStorage.getItem(HIST_KEY)||'[]'); }catch(e){ return []; } }
+function histSave(data){ try{ localStorage.setItem(HIST_KEY, JSON.stringify(data)); }catch(e){ console.warn('History save failed',e); } }
+function snapLoad(){ try{ return JSON.parse(localStorage.getItem(SNAP_KEY)||'[]'); }catch(e){ return []; } }
+function snapSave(data){ try{ localStorage.setItem(SNAP_KEY, JSON.stringify(data)); }catch(e){} }
+
+// ── Record an event ──
+function histRecord(type, payload){
+  const events = histLoad();
+  events.unshift({ type, ts: Date.now(), ...payload });
+  if(events.length > MAX_EVENTS) events.length = MAX_EVENTS;
+  histSave(events);
+  if(document.getElementById('tab-history').classList.contains('active')) renderHistory();
+  updateHistStats();
+}
+
+// ── Record a KDJ snapshot every 30s ──
+function snapRecord(){
+  if(!tfData['1D']?.latest) return;
+  const snaps = snapLoad();
+  snaps.unshift({
+    ts: Date.now(),
+    price: currentPrice,
+    xrp: {
+      '3D': { dir: tfData['3D']?.dir, k: tfData['3D']?.latest?.k, d: tfData['3D']?.latest?.d, j: tfData['3D']?.latest?.j },
+      '1D': { dir: tfData['1D']?.dir, k: tfData['1D']?.latest?.k, d: tfData['1D']?.latest?.d, j: tfData['1D']?.latest?.j },
+      '4H': { dir: tfData['4H']?.dir, k: tfData['4H']?.latest?.k, d: tfData['4H']?.latest?.d, j: tfData['4H']?.latest?.j },
+      '1H': { dir: tfData['1H']?.dir, cross: tfData['1H']?.cross },
+    },
+    btc: {
+      '3D': { dir: btcTfData['3D']?.dir, k: btcTfData['3D']?.latest?.k, d: btcTfData['3D']?.latest?.d, j: btcTfData['3D']?.latest?.j },
+      '1D': { dir: btcTfData['1D']?.dir },
+      '4H': { dir: btcTfData['4H']?.dir },
+    }
+  });
+  if(snaps.length > MAX_SNAPS) snaps.length = MAX_SNAPS;
+  snapSave(snaps);
+}
+
+// ── Hook into existing functions ──
+// Called when Tier 1 signal fires
+function histOnXrpSignal(dir, price){
+  histRecord('signal_t1', {
+    dir, price,
+    xrp3d: tfData['3D']?.dir, xrp1d: tfData['1D']?.dir, xrp4h: tfData['4H']?.dir,
+    btc3d: btcTfData['3D']?.dir, btc1d: btcTfData['1D']?.dir,
+    d1J: tfData['1D']?.latest?.j?.toFixed(1),
+    d1KDGap: Math.abs((tfData['1D']?.latest?.k||50)-(tfData['1D']?.latest?.d||50)).toFixed(1),
+    label: '⚡ Tier 1 XRP Signal',
+  });
+}
+
+// Called when Tier 2 signal fires
+function histOnBtcSignal(dir, price){
+  histRecord('signal_t2', {
+    dir, price,
+    xrp3d: tfData['3D']?.dir, xrp1d: tfData['1D']?.dir, xrp4h: tfData['4H']?.dir,
+    btc3d: btcTfData['3D']?.dir, btc1d: btcTfData['1D']?.dir,
+    d1J: tfData['1D']?.latest?.j?.toFixed(1),
+    d1KDGap: Math.abs((tfData['1D']?.latest?.k||50)-(tfData['1D']?.latest?.d||50)).toFixed(1),
+    label: '🚀 Tier 2 XRP+BTC Signal',
+  });
+}
+
+// Called when trade locks
+function histOnLock(dir, entry, tp1, tp2, sl){
+  histRecord('trade_open', {
+    dir, entry, tp1, tp2, sl,
+    d1J: tfData['1D']?.latest?.j?.toFixed(1),
+    btcDir: btcTfData['3D']?.dir,
+    label: dir==='bull'?'🔒 LONG Locked':'🔒 SHORT Locked',
+    tradeId: Date.now(),
+  });
+}
+
+// Called when trade closes (TP1, TP2, SL, or manual)
+function histOnClose(dir, entry, exitPrice, outcome, hoursOpen){
+  const rawPnl = dir==='bull'?(exitPrice-entry)/entry*100:(entry-exitPrice)/entry*100;
+  histRecord('trade_close', {
+    dir, entry, exitPrice, outcome, hoursOpen,
+    rawPnl: rawPnl.toFixed(2),
+    d1J: tfData['1D']?.latest?.j?.toFixed(1),
+    d1KDGap: Math.abs((tfData['1D']?.latest?.k||50)-(tfData['1D']?.latest?.d||50)).toFixed(1),
+    label: outcome==='WIN'?'🏆 TP2 Hit':outcome==='PARTIAL'?'✅ TP1 Hit':outcome==='LOSS'?'🛑 SL Hit':'✕ Manual Close',
+  });
+}
+
+// ── Update summary stats ──
+function updateHistStats(){
+  const events = histLoad();
+  const signals = events.filter(e=>e.type==='signal_t1'||e.type==='signal_t2');
+  const opens   = events.filter(e=>e.type==='trade_open');
+  const closes  = events.filter(e=>e.type==='trade_close');
+  const wins    = closes.filter(e=>e.outcome==='WIN'||e.outcome==='PARTIAL');
+  const wr      = closes.length ? (wins.length/closes.length*100).toFixed(0)+'%' : '—';
+  const avgHold = closes.length ? Math.round(closes.reduce((a,e)=>a+(e.hoursOpen||0),0)/closes.length)+'h' : '—';
+  document.getElementById('hStatSignals').textContent = signals.length;
+  document.getElementById('hStatTrades').textContent  = opens.length;
+  document.getElementById('hStatWR').textContent      = wr;
+  document.getElementById('hStatWR').className        = 'stat-value '+(closes.length?(parseFloat(wr)>=55?'green':'amber'):'blue');
+  document.getElementById('hStatAvgHold').textContent = avgHold;
+
+  // Storage usage
+  const used = (localStorage.getItem(HIST_KEY)||'').length + (localStorage.getItem(SNAP_KEY)||'').length;
+  document.getElementById('histStorageInfo').textContent = `${(used/1024).toFixed(1)} KB stored · ${events.length} events · ${snapLoad().length} snapshots`;
+}
+
+// ── Render insight panel ──
+function renderInsights(events){
+  const closes = events.filter(e=>e.type==='trade_close');
+  if(closes.length < 3){ document.getElementById('histInsight').style.display='none'; return; }
+  document.getElementById('histInsight').style.display='block';
+
+  const wins   = closes.filter(e=>e.outcome==='WIN'||e.outcome==='PARTIAL');
+  const losses = closes.filter(e=>e.outcome==='LOSS');
+
+  // Long vs Short win rate
+  const longs  = closes.filter(e=>e.dir==='bull');
+  const shorts = closes.filter(e=>e.dir==='bear');
+  const longWR = longs.length  ? (longs.filter(e=>e.outcome==='WIN'||e.outcome==='PARTIAL').length/longs.length*100).toFixed(0) : '—';
+  const shrtWR = shorts.length ? (shorts.filter(e=>e.outcome==='WIN'||e.outcome==='PARTIAL').length/shorts.length*100).toFixed(0) : '—';
+
+  // Avg hold on wins vs losses
+  const avgWinHold  = wins.length   ? Math.round(wins.reduce((a,e)=>a+(e.hoursOpen||0),0)/wins.length)   : '—';
+  const avgLossHold = losses.length ? Math.round(losses.reduce((a,e)=>a+(e.hoursOpen||0),0)/losses.length) : '—';
+
+  // Best and worst trade
+  const best  = closes.reduce((a,e)=>parseFloat(e.rawPnl||0)>parseFloat(a.rawPnl||0)?e:a, closes[0]);
+  const worst = closes.reduce((a,e)=>parseFloat(e.rawPnl||0)<parseFloat(a.rawPnl||0)?e:a, closes[0]);
+
+  // J value at winning exits vs losing exits
+  const avgWinJ  = wins.length   ? (wins.reduce((a,e)=>a+parseFloat(e.d1J||50),0)/wins.length).toFixed(1)   : '—';
+  const avgLossJ = losses.length ? (losses.reduce((a,e)=>a+parseFloat(e.d1J||50),0)/losses.length).toFixed(1) : '—';
+
+  // Tier 1 vs Tier 2 signal outcomes
+  const allSignals = events.filter(e=>e.type==='signal_t1'||e.type==='signal_t2');
+  const t1 = allSignals.filter(e=>e.type==='signal_t1').length;
+  const t2 = allSignals.filter(e=>e.type==='signal_t2').length;
+
+  document.getElementById('histInsightContent').innerHTML = `
+    <div style="background:var(--bg3);padding:10px;border-radius:6px;">
+      <div style="color:var(--text3);font-size:.62rem;margin-bottom:6px;text-transform:uppercase;letter-spacing:.5px;">Long vs Short</div>
+      <div>▲ LONG win rate: <b style="color:var(--bull2)">${longWR}%</b> (${longs.length} trades)</div>
+      <div>▼ SHORT win rate: <b style="color:var(--bear2)">${shrtWR}%</b> (${shorts.length} trades)</div>
+    </div>
+    <div style="background:var(--bg3);padding:10px;border-radius:6px;">
+      <div style="color:var(--text3);font-size:.62rem;margin-bottom:6px;text-transform:uppercase;letter-spacing:.5px;">Hold Time</div>
+      <div>Winning trades avg: <b style="color:var(--bull2)">${avgWinHold}h</b></div>
+      <div>Losing trades avg: <b style="color:var(--bear2)">${avgLossHold}h</b></div>
+    </div>
+    <div style="background:var(--bg3);padding:10px;border-radius:6px;">
+      <div style="color:var(--text3);font-size:.62rem;margin-bottom:6px;text-transform:uppercase;letter-spacing:.5px;">1D J at Exit</div>
+      <div>Avg J on wins: <b style="color:var(--bull2)">${avgWinJ}</b></div>
+      <div>Avg J on losses: <b style="color:var(--bear2)">${avgLossJ}</b></div>
+      <div style="color:var(--text3);font-size:.65rem;margin-top:4px;">Lower J on wins = exited before exhaustion</div>
+    </div>
+    <div style="background:var(--bg3);padding:10px;border-radius:6px;">
+      <div style="color:var(--text3);font-size:.62rem;margin-bottom:6px;text-transform:uppercase;letter-spacing:.5px;">Signal Tiers</div>
+      <div>⚡ Tier 1 (XRP only): <b style="color:var(--amber)">${t1}</b></div>
+      <div>🚀 Tier 2 (XRP+BTC): <b style="color:var(--bull2)">${t2}</b></div>
+      <div style="color:var(--text3);font-size:.65rem;margin-top:4px;">Best: ${best?'$'+parseFloat(best.rawPnl).toFixed(2)+'% raw':'—'} · Worst: ${worst?'$'+parseFloat(worst.rawPnl).toFixed(2)+'% raw':'—'}</div>
+    </div>`;
+}
+
+// ── Render the event log ──
+function renderHistory(){
+  const filter = document.getElementById('histFilter').value;
+  let events = histLoad();
+
+  if(filter==='signal')  events = events.filter(e=>e.type==='signal_t1'||e.type==='signal_t2');
+  if(filter==='trade')   events = events.filter(e=>e.type==='trade_open');
+  if(filter==='outcome') events = events.filter(e=>e.type==='trade_close');
+
+  document.getElementById('histCount').textContent = `— ${events.length} entries`;
+  renderInsights(histLoad()); // always render insights from full dataset
+
+  const log = document.getElementById('histLog');
+  if(!events.length){
+    log.innerHTML='<div style="color:var(--text3);text-align:center;padding:30px;font-size:.75rem;">No events match this filter yet.</div>';
+    return;
+  }
+
+  log.innerHTML = events.map(e=>{
+    const date = new Date(e.ts).toLocaleDateString('en-GB',{day:'2-digit',month:'short',year:'2-digit'});
+    const time = new Date(e.ts).toLocaleTimeString('en-US',{hour12:false,hour:'2-digit',minute:'2-digit'});
+    const dirColor = e.dir==='bull'?'var(--bull2)':e.dir==='bear'?'var(--bear2)':'var(--text2)';
+    const pnlColor = parseFloat(e.rawPnl||0)>=0?'var(--bull2)':'var(--bear2)';
+
+    let body='';
+    if(e.type==='signal_t1'||e.type==='signal_t2'){
+      body=`<div style="display:flex;gap:16px;flex-wrap:wrap;margin-top:4px;">
+        <span style="color:${dirColor};font-weight:700;">${e.dir==='bull'?'▲ LONG':'▼ SHORT'}</span>
+        <span>Price: <b>$${parseFloat(e.price||0).toFixed(4)}</b></span>
+        <span>XRP: ${e.xrp3d}·${e.xrp1d}·${e.xrp4h}</span>
+        <span>BTC: ${e.btc3d}·${e.btc1d}</span>
+        <span style="color:var(--text3);">1D J:${e.d1J} gap:${e.d1KDGap}</span>
+      </div>`;
+    } else if(e.type==='trade_open'){
+      body=`<div style="display:flex;gap:16px;flex-wrap:wrap;margin-top:4px;">
+        <span style="color:${dirColor};font-weight:700;">${e.dir==='bull'?'▲ LONG':'▼ SHORT'}</span>
+        <span>Entry: <b>$${parseFloat(e.entry||0).toFixed(4)}</b></span>
+        <span style="color:var(--bull2);">TP1: $${parseFloat(e.tp1||0).toFixed(4)}</span>
+        <span style="color:var(--bull2);">TP2: $${parseFloat(e.tp2||0).toFixed(4)}</span>
+        <span style="color:var(--bear2);">SL: $${parseFloat(e.sl||0).toFixed(4)}</span>
+      </div>`;
+    } else if(e.type==='trade_close'){
+      body=`<div style="display:flex;gap:16px;flex-wrap:wrap;margin-top:4px;">
+        <span style="color:${dirColor};font-weight:700;">${e.dir==='bull'?'▲ LONG':'▼ SHORT'}</span>
+        <span>Entry: $${parseFloat(e.entry||0).toFixed(4)} → Exit: $${parseFloat(e.exitPrice||0).toFixed(4)}</span>
+        <span style="color:${pnlColor};font-weight:700;">${parseFloat(e.rawPnl||0)>=0?'+':''}${e.rawPnl}% raw</span>
+        <span style="color:var(--text3);">${e.hoursOpen}h open · J:${e.d1J} · gap:${e.d1KDGap}</span>
+      </div>`;
+    }
+
+    const typeColors = {signal_t1:'var(--amber)',signal_t2:'var(--bull2)',trade_open:'var(--blue2)',trade_close:parseFloat(e.rawPnl||0)>=0?'var(--bull2)':'var(--bear2)'};
+    const borderColor = typeColors[e.type]||'var(--border)';
+
+    return `<div style="background:var(--bg2);border:1px solid var(--border);border-left:3px solid ${borderColor};border-radius:6px;padding:9px 12px;">
+      <div style="display:flex;justify-content:space-between;align-items:center;">
+        <span style="font-size:.72rem;font-weight:700;color:${borderColor};">${e.label||e.type}</span>
+        <span style="font-size:.62rem;color:var(--text3);">${date} ${time}</span>
+      </div>
+      ${body}
+    </div>`;
+  }).join('');
+}
+
+// ── Export CSV ──
+function exportHistoryCSV(){
+  const events = histLoad();
+  if(!events.length){ alert('No history to export yet.'); return; }
+  const rows = [['Date','Time','Type','Direction','Price/Entry','ExitPrice','RawPnl%','Outcome','HoursOpen','1DJ','KDGap','XRP3D','XRP1D','XRP4H','BTC3D','BTC1D']];
+  events.forEach(e=>{
+    const d=new Date(e.ts);
+    rows.push([
+      d.toLocaleDateString('en-GB'),
+      d.toLocaleTimeString('en-US',{hour12:false}),
+      e.type, e.dir||'',
+      e.price||e.entry||'', e.exitPrice||'',
+      e.rawPnl||'', e.outcome||'',
+      e.hoursOpen||'', e.d1J||'', e.d1KDGap||'',
+      e.xrp3d||'', e.xrp1d||'', e.xrp4h||'',
+      e.btc3d||'', e.btc1d||''
+    ]);
+  });
+  const csv=rows.map(r=>r.map(v=>'"'+String(v).replace(/"/g,'""')+'"').join(',')).join('\n');
+  const a=document.createElement('a');
+  a.href='data:text/csv;charset=utf-8,'+encodeURIComponent(csv);
+  a.download='kdj-history-'+new Date().toISOString().slice(0,10)+'.csv';
+  a.click();
+}
+
+// ── Clear history ──
+function clearHistory(){
+  if(!confirm('Clear all recorded history? This cannot be undone.')) return;
+  localStorage.removeItem(HIST_KEY);
+  localStorage.removeItem(SNAP_KEY);
+  updateHistStats();
+  renderHistory();
+}
+
+// ═══════════════════════════════════════════════════
+// HOOK HISTORY INTO EXISTING SIGNAL + TRADE EVENTS
+// ═══════════════════════════════════════════════════
+// Patch lockTrade to also record to history
+const _origLockTrade = lockTrade;
+function lockTrade(dir){
+  _origLockTrade(dir);
+  if(activeTrade){
+    histOnLock(activeTrade.dir, activeTrade.entry, activeTrade.tp1, activeTrade.tp2, activeTrade.sl);
+  }
+}
+
+// Patch resetTrade to record close reason
+const _origResetTrade = resetTrade;
+function resetTrade(outcome, exitPrice){
+  if(activeTrade){
+    const hoursOpen = Math.round((Date.now()-activeTrade.lockedAt)/3600000);
+    histOnClose(activeTrade.dir, activeTrade.entry, exitPrice||currentPrice, outcome||'manual', hoursOpen);
+  }
+  _origResetTrade();
+}
+
+// Patch renderTrade TP/SL hits to pass outcome to resetTrade
+// We intercept the specific outcomes in renderTrade by monitoring the addAlert calls
+// Actually we patch the three exit points directly:
+const _origRenderTrade = renderTrade;
+function renderTrade(){
+  if(!activeTrade){_origResetTrade();return;}
+  const t=activeTrade, isLong=t.dir==='bull', price=currentPrice;
+
+  // TP1
+  if(!t.tp1Hit&&((isLong&&price>=t.tp1)||(!isLong&&price<=t.tp1))){
+    t.tp1Hit=true;
+    addAlert(`✅ TP1 HIT — ${isLong?'LONG':'SHORT'} at $${price.toFixed(4)}. Take 50% profit. Move SL to entry.`,isLong?'bull':'bear','TP1');
+    playBeep('signal');
+    if(Notification.permission==='granted') new Notification('✅ TP1 Hit!',{body:`${isLong?'LONG':'SHORT'} TP1 at $${price.toFixed(4)}.`});
+    // Record TP1 partial hit but keep trade open
+    histRecord('trade_tp1',{dir:t.dir,entry:t.entry,exitPrice:price,outcome:'PARTIAL',hoursOpen:Math.round((Date.now()-t.lockedAt)/3600000),rawPnl:((isLong?(price-t.entry)/t.entry:(t.entry-price)/t.entry)*100).toFixed(2),d1J:tfData['1D']?.latest?.j?.toFixed(1),d1KDGap:Math.abs((tfData['1D']?.latest?.k||50)-(tfData['1D']?.latest?.d||50)).toFixed(1),label:'✅ TP1 Hit — trade still open'});
+  }
+  // SL
+  if((isLong&&price<=t.sl)||(!isLong&&price>=t.sl)){
+    addAlert(`🛑 STOP LOSS HIT — Exit at $${price.toFixed(4)}`,'bear','SL');
+    playBeep('arm');
+    if(Notification.permission==='granted') new Notification('🛑 Stop Loss Hit',{body:`Exit now at $${price.toFixed(4)}`});
+    const hoursOpen=Math.round((Date.now()-t.lockedAt)/3600000);
+    histOnClose(t.dir,t.entry,price,'LOSS',hoursOpen);
+    activeTrade=null; _origResetTrade(); return;
+  }
+  // TP2
+  if((isLong&&price>=t.tp2)||(!isLong&&price<=t.tp2)){
+    addAlert(`🏆 TP2 HIT — Full target at $${price.toFixed(4)}. Close trade.`,'bull','TP2');
+    playBeep('signal');
+    if(Notification.permission==='granted') new Notification('🏆 TP2 Hit!',{body:`Full target at $${price.toFixed(4)}`});
+    const hoursOpen=Math.round((Date.now()-t.lockedAt)/3600000);
+    histOnClose(t.dir,t.entry,price,'WIN',hoursOpen);
+    activeTrade=null; _origResetTrade(); return;
+  }
+
+  // Continue with verdict rendering (call original but skip its TP/SL checks)
+  // Re-implement verdict only (price levels already checked above)
+  document.getElementById('tradeNoSignal').style.display='none';
+  document.getElementById('tradeActive').style.display='block';
+  document.getElementById('tradePanelTitle').textContent=isLong?'▲ LONG TRADE ACTIVE':'▼ SHORT TRADE ACTIVE';
+  const badge=document.getElementById('tradeDirBadge');
+  badge.textContent=isLong?'▲ LONG':'▼ SHORT';
+  badge.style.background=isLong?'var(--bull-bg)':'var(--bear-bg)';
+  badge.style.color=isLong?'var(--bull2)':'var(--bear2)';
+  badge.style.border=isLong?'1px solid rgba(0,232,232,.3)':'1px solid rgba(255,45,85,.3)';
+  document.getElementById('entryPrice').textContent='$'+t.entry.toFixed(4);
+  document.getElementById('tp1Val').textContent='$'+t.tp1.toFixed(4);
+  document.getElementById('tp2Val').textContent='$'+t.tp2.toFixed(4);
+  document.getElementById('slVal').textContent='$'+t.sl.toFixed(4);
+  document.getElementById('tp1Tag').textContent=t.tp1Hit?'✓ HIT':(isLong?'+5%':'-5%');
+  document.getElementById('tp1Tag').style.background=t.tp1Hit?'var(--bull2)':'var(--bull-bg)';
+  document.getElementById('tp1Tag').style.color=t.tp1Hit?'#000':'var(--bull2)';
+  document.getElementById('tp2Tag').textContent=isLong?'+12%':'-12%';
+  document.getElementById('slTag').textContent=isLong?'-3%':'+3%';
+  const risk=Math.abs(t.entry-t.sl),reward=Math.abs(t.tp2-t.entry);
+  document.getElementById('rrVal').textContent=(reward/risk).toFixed(2)+':1';
+  const rawPnl=isLong?(price-t.entry)/t.entry*100:(t.entry-price)/t.entry*100;
+  document.getElementById('tradeCurPrice').textContent='$'+price.toFixed(4);
+  const pnlEl=document.getElementById('tradePnlPct');
+  pnlEl.textContent=(rawPnl>=0?'+':'')+rawPnl.toFixed(2)+'%';
+  pnlEl.style.color=rawPnl>=0?'var(--bull2)':'var(--bear2)';
+
+  // Verdict engine
+  const d1latest=tfData['1D']?.latest;
+  const d1J=d1latest?.j??50,d1K=d1latest?.k??50,d1D=d1latest?.d??50;
+  const prevD1J=t._prevD1J??d1J; t._prevD1J=d1J;
+  const kdGap=Math.abs(d1K-d1D);
+  const kOnSide=isLong?(d1K>d1D):(d1K<d1D);
+  const d1Flipped=!kOnSide;
+  const momentumStrong=kdGap>15,momentumWeak=kdGap<8,momentumNarrow=kdGap<5;
+  const jAtExtreme=(isLong&&d1J>80)||(!isLong&&d1J<20);
+  const jTurning=(isLong&&d1J<prevD1J&&d1J>65)||(!isLong&&d1J>prevD1J&&d1J<35);
+  const hoursOpen=Math.round((Date.now()-t.lockedAt)/3600000);
+  const tp2Dist=Math.abs(t.tp2-price),tp2Total=Math.abs(t.tp2-t.entry);
+  const tp2Prog=Math.max(0,((tp2Total-tp2Dist)/tp2Total*100)).toFixed(0);
+  const tradeFlat=hoursOpen>120&&parseFloat(tp2Prog)<30&&!t.tp1Hit;
+  const vEl=document.getElementById('tradeVerdict');
+  if(d1Flipped){
+    vEl.style.background='var(--bear-bg)';vEl.style.borderColor='rgba(255,45,85,.4)';
+    vEl.innerHTML=`<b style="color:var(--bear2)">🛑 CLOSE NOW — 1D Already Flipped</b><br>1D K crossed ${isLong?'below':'above'} D. Daily trend fully reversed. Exit immediately. ${t.tp1Hit?'TP1 secured — close remainder.':'Minimise loss — exit now.'}<br><span style="color:var(--text3);font-size:.65rem;">Hours: ${hoursOpen}h · J: ${d1J.toFixed(1)} · K-D: ${kdGap.toFixed(1)}</span>`;
+    if(!t._closeAlertSent){t._closeAlertSent=true;addAlert(`🛑 CLOSE ${isLong?'LONG':'SHORT'} — 1D fully flipped.`,'bear','EXIT');playBeep('arm');if(Notification.permission==='granted') new Notification('🛑 Close Now',{body:`1D flipped at $${price.toFixed(4)}`});}
+  }else if(jTurning&&momentumWeak){
+    vEl.style.background='var(--bear-bg)';vEl.style.borderColor='rgba(255,45,85,.3)';
+    vEl.innerHTML=`<b style="color:var(--bear2)">⚠️ EXIT NOW — 1D Cross Forming</b><br>J turning ${isLong?'down':'up'}: ${prevD1J.toFixed(1)}→${d1J.toFixed(1)} AND K-D at ${kdGap.toFixed(1)}pts. Exit before cross completes. ${t.tp1Hit?'✅ TP1 secured.':'Exit to protect capital.'}<br><span style="color:var(--text3);font-size:.65rem;">Hours: ${hoursOpen}h · TP2: ${tp2Prog}%</span>`;
+    if(!t._earlyExitSent){t._earlyExitSent=true;addAlert(`⚠️ EXIT ${isLong?'LONG':'SHORT'} — J turning + K-D ${kdGap.toFixed(1)}pts.`,'warn','EXIT');playBeep('arm');if(Notification.permission==='granted') new Notification('⚠️ Exit Now',{body:`J turning + K-D ${kdGap.toFixed(1)}pts at $${price.toFixed(4)}`});}
+  }else if(jTurning&&!momentumWeak){
+    vEl.style.background='var(--amber-bg)';vEl.style.borderColor='rgba(245,166,35,.3)';
+    vEl.innerHTML=`<b style="color:var(--amber)">⚡ WATCH — J Turning, Gap Still OK</b><br>J: ${prevD1J.toFixed(1)}→${d1J.toFixed(1)}. K-D gap ${kdGap.toFixed(1)}pts still OK. Exit if gap drops below 8.<br><span style="color:var(--text3);font-size:.65rem;">Hours: ${hoursOpen}h · TP2: ${tp2Prog}%</span>`;
+  }else if(momentumNarrow&&!jTurning){
+    vEl.style.background='var(--amber-bg)';vEl.style.borderColor='rgba(245,166,35,.3)';
+    vEl.innerHTML=`<b style="color:var(--amber)">⚡ WATCH — K-D Critical (${kdGap.toFixed(1)}pts)</b><br>K and D almost touching. J at ${d1J.toFixed(1)}. ${jAtExtreme?'At extreme — any turn = exit.':'Watch for J to turn.'}<br><span style="color:var(--text3);font-size:.65rem;">Hours: ${hoursOpen}h · TP2: ${tp2Prog}%</span>`;
+  }else if(jAtExtreme&&momentumStrong){
+    vEl.style.background='rgba(245,166,35,.04)';vEl.style.borderColor='rgba(245,166,35,.2)';
+    vEl.innerHTML=`<b style="color:var(--amber)">📡 J EXTREME — Momentum Still Strong</b><br>J at ${d1J.toFixed(1)}. K-D ${kdGap.toFixed(1)}pts — no cross yet. Watch for J to turn. ${t.tp1Hit?'TP1 secured.':'Target $'+t.tp2.toFixed(4)+'.'}<br><span style="color:var(--text3);font-size:.65rem;">Hours: ${hoursOpen}h · TP2: ${tp2Prog}%</span>`;
+  }else if(tradeFlat){
+    vEl.style.background='var(--amber-bg)';vEl.style.borderColor='rgba(245,166,35,.25)';
+    vEl.innerHTML=`<b style="color:var(--amber)">⏱ STALLING — ${hoursOpen}h, ${tp2Prog}% to TP2</b><br>Little progress. 1D still ${isLong?'bullish':'bearish'}. Exit if J turns or K-D &lt;8.<br><span style="color:var(--text3);font-size:.65rem;">K-D: ${kdGap.toFixed(1)} · J: ${d1J.toFixed(1)}</span>`;
+  }else if(t.tp1Hit){
+    vEl.style.background='rgba(0,232,122,.06)';vEl.style.borderColor='rgba(0,232,122,.25)';
+    vEl.innerHTML=`<b style="color:var(--bull2)">✅ TP1 HIT — HOLD FOR TP2</b><br>1D KDJ ${isLong?'bullish':'bearish'} · K-D: ${kdGap.toFixed(1)}pts. Move SL to entry. TP2 $${t.tp2.toFixed(4)}.<br><span style="color:var(--text3);font-size:.65rem;">Hours: ${hoursOpen}h · J: ${d1J.toFixed(1)} · TP2: ${tp2Prog}%</span>`;
+  }else{
+    vEl.style.background='rgba(0,232,122,.06)';vEl.style.borderColor='rgba(0,232,122,.25)';
+    vEl.innerHTML=`<b style="color:var(--bull2)">💪 TRADE VALID — HOLD</b><br>1D KDJ ${isLong?'bullish':'bearish'} · K-D: ${kdGap.toFixed(1)}pts ${momentumStrong?'— strong':'— building'}. J: ${d1J.toFixed(1)}${jAtExtreme?' ⚠️ near extreme':''}.<br><span style="color:var(--text3);font-size:.65rem;">Hours: ${hoursOpen}h · TP2: ${tp2Prog}%</span>`;
+  }
+}
+
+// ─── Hook signals into history from fetchAndRender ───
+// We patch the signal section by wrapping the existing fetch flow
+const _origFetchAndRender = fetchAndRender;
+async function fetchAndRender(){
+  await _origFetchAndRender();
+  // Record KDJ snapshot on every successful fetch
+  snapRecord();
+}
+
+// Patch signal detection — inject history calls after signals fire
+// We do this by monkey-patching lastXrpSignalState + lastBtcSignalState checks
+// Since they live in fetchAndRender we use a post-render hook via a global flag
+let _prevXrpSig=false, _prevBtcSig=false;
+setInterval(()=>{
+  if(lastXrpSignalState && !_prevXrpSig) histOnXrpSignal((['3D','1D','4H'].every(k=>tfData[k]?.dir==='bull')?'bull':'bear'), currentPrice);
+  if(lastBtcSignalState && !_prevBtcSig) histOnBtcSignal((['3D','1D','4H'].every(k=>tfData[k]?.dir==='bull')?'bull':'bear'), currentPrice);
+  _prevXrpSig=lastXrpSignalState;
+  _prevBtcSig=lastBtcSignalState;
+},1000);
+
+// Init history on load
+updateHistStats();
 document.querySelectorAll('.tab-btn').forEach(btn=>btn.addEventListener('click',()=>{
   document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
   document.querySelectorAll('.content').forEach(c=>c.classList.remove('active'));
