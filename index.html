@@ -208,6 +208,7 @@ body::before{content:'';position:fixed;inset:0;background:repeating-linear-gradi
   <button class="tab-btn active" data-tab="monitor">Monitor</button>
   <button class="tab-btn" data-tab="backtest">Backtest</button>
   <button class="tab-btn" data-tab="history">History</button>
+  <button class="tab-btn" data-tab="explorer">Explorer</button>
 </nav>
 
 <!-- MONITOR TAB -->
@@ -388,6 +389,191 @@ body::before{content:'';position:fixed;inset:0;background:repeating-linear-gradi
   </div>
 
 </div><!-- /history -->
+
+<!-- STRATEGY EXPLORER TAB -->
+<div class="content" id="tab-explorer">
+
+  <div style="background:var(--bg2);border:1px solid var(--border);border-radius:8px;padding:14px;margin-bottom:14px;">
+    <div style="font-size:.65rem;color:var(--text3);text-transform:uppercase;letter-spacing:1px;margin-bottom:10px;">Strategy Explorer — Test rule combinations against real Binance data</div>
+    <div style="font-size:.72rem;color:var(--text2);line-height:1.6;">Adjust the rules below, run the test, and compare results side by side. Focus on the <b style="color:var(--amber)">Loss Analysis</b> section — that's where strategy improvements come from.</div>
+  </div>
+
+  <!-- RULE BUILDER -->
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px;">
+
+    <!-- ENTRY RULES -->
+    <div class="panel">
+      <div class="panel-title">Entry Rules</div>
+      <div style="display:flex;flex-direction:column;gap:10px;">
+
+        <div>
+          <label class="bt-label">Period</label>
+          <select class="bt-select" id="exPeriod" style="width:100%;">
+            <option value="180">180 Days</option>
+            <option value="365" selected>1 Year</option>
+            <option value="730">2 Years</option>
+          </select>
+        </div>
+
+        <div>
+          <label class="bt-label">Higher TF Alignment Required</label>
+          <select class="bt-select" id="exAlignment" style="width:100%;">
+            <option value="3d_1d_4h" selected>3D + 1D + 4H (current)</option>
+            <option value="3d_1d">3D + 1D only</option>
+            <option value="1d_4h">1D + 4H only</option>
+            <option value="3d_only">3D only</option>
+          </select>
+        </div>
+
+        <div>
+          <label class="bt-label">Entry Trigger</label>
+          <select class="bt-select" id="exEntryTrigger" style="width:100%;">
+            <option value="1h_cross" selected>1H KDJ Cross (current)</option>
+            <option value="4h_cross">4H KDJ Cross</option>
+            <option value="1d_cross">1D KDJ Cross</option>
+            <option value="j_above_50">1H J crosses 50</option>
+          </select>
+        </div>
+
+        <div>
+          <label class="bt-label">BTC Confirmation</label>
+          <select class="bt-select" id="exBtcMode" style="width:100%;">
+            <option value="off">Off — XRP only</option>
+            <option value="3d_1d_4h" selected>BTC 3D+1D+4H must agree</option>
+            <option value="3d_only">BTC 3D only must agree</option>
+          </select>
+        </div>
+
+        <div>
+          <label class="bt-label">Min 1D J Value at Entry (long) / Max (short)</label>
+          <div style="display:flex;gap:8px;align-items:center;">
+            <input class="bt-input" type="number" id="exMinJ" value="0" min="0" max="80" style="width:70px;" title="Only enter long if 1D J is above this. 0 = no filter."/>
+            <span style="font-size:.65rem;color:var(--text3);">Long: J must be above this value</span>
+          </div>
+        </div>
+
+        <div>
+          <label class="bt-label">Min K-D Gap at Entry (1D)</label>
+          <div style="display:flex;gap:8px;align-items:center;">
+            <input class="bt-input" type="number" id="exMinKDGap" value="0" min="0" max="40" style="width:70px;" title="Only enter if 1D K-D gap is wider than this. 0 = no filter."/>
+            <span style="font-size:.65rem;color:var(--text3);">wider = stronger momentum</span>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- EXIT RULES -->
+    <div class="panel">
+      <div class="panel-title">Exit Rules</div>
+      <div style="display:flex;flex-direction:column;gap:10px;">
+
+        <div>
+          <label class="bt-label">TP1 %</label>
+          <input class="bt-input" type="number" id="exTp1" value="5" min="1" max="30" style="width:100%;"/>
+        </div>
+
+        <div>
+          <label class="bt-label">TP2 %</label>
+          <input class="bt-input" type="number" id="exTp2" value="12" min="1" max="50" style="width:100%;"/>
+        </div>
+
+        <div>
+          <label class="bt-label">Stop Loss %</label>
+          <input class="bt-input" type="number" id="exSl" value="3" min="0.5" max="20" style="width:100%;"/>
+        </div>
+
+        <div>
+          <label class="bt-label">Max Hold (hours)</label>
+          <input class="bt-input" type="number" id="exMaxHold" value="336" min="24" max="720" style="width:100%;"/>
+        </div>
+
+        <div>
+          <label class="bt-label">Leverage (for P&L display)</label>
+          <select class="bt-select" id="exLev" style="width:100%;">
+            <option value="1">1X (raw %)</option>
+            <option value="5">5X</option>
+            <option value="10" selected>10X</option>
+            <option value="20">20X</option>
+          </select>
+        </div>
+
+        <div>
+          <label class="bt-label">Max J at Entry (avoid overextended)</label>
+          <div style="display:flex;gap:8px;align-items:center;">
+            <input class="bt-input" type="number" id="exMaxJ" value="100" min="50" max="100" style="width:70px;" title="Skip entry if 1D J already above this. 100 = no filter."/>
+            <span style="font-size:.65rem;color:var(--text3);">100 = no filter</span>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+  </div>
+
+  <!-- RUN BUTTON -->
+  <div style="display:flex;gap:10px;align-items:center;margin-bottom:14px;flex-wrap:wrap;">
+    <button class="run-btn" id="runExplorer" onclick="runExplorer().catch(e=>console.error(e))">▶ RUN STRATEGY TEST</button>
+    <button id="exSaveBtn" style="display:none;padding:8px 16px;background:var(--bg3);border:1px solid var(--border2);color:var(--blue2);border-radius:5px;font-family:var(--mono);font-size:.75rem;cursor:pointer;" onclick="saveExplorerResult()">★ SAVE THIS RESULT</button>
+    <span style="font-size:.65rem;color:var(--text3);">Tip: run the same period with different rules and compare the saved results below</span>
+  </div>
+
+  <!-- PROGRESS -->
+  <div id="exProgress" style="display:none;margin-bottom:14px;">
+    <div style="font-size:.75rem;color:var(--text2);margin-bottom:6px;" id="exProgressText">Loading...</div>
+    <div class="progress-bar"><div class="progress-fill" id="exProgressFill" style="width:0%"></div></div>
+  </div>
+
+  <!-- RESULTS -->
+  <div id="exResults" style="display:none;">
+
+    <!-- STATS COMPARISON -->
+    <div id="exStatsGrid" class="bt-stats" style="margin-bottom:14px;"></div>
+
+    <!-- EQUITY CURVE -->
+    <div class="bt-chart" style="margin-bottom:14px;">
+      <div class="bt-chart-title" id="exCurveTitle">Equity Curve</div>
+      <svg class="equity-svg" id="exEquitySvg"></svg>
+    </div>
+
+    <!-- LOSS ANALYSIS — the key section -->
+    <div class="panel" style="margin-bottom:14px;border-color:rgba(255,45,85,.25);">
+      <div class="panel-title" style="color:var(--bear2);">Loss Analysis — What went wrong on losing trades</div>
+      <div id="exLossAnalysis" style="font-size:.72rem;line-height:1.7;color:var(--text2);"></div>
+    </div>
+
+    <!-- WIN ANALYSIS -->
+    <div class="panel" style="margin-bottom:14px;border-color:rgba(0,232,122,.2);">
+      <div class="panel-title" style="color:var(--bull2);">Win Pattern — What winning trades had in common</div>
+      <div id="exWinAnalysis" style="font-size:.72rem;line-height:1.7;color:var(--text2);"></div>
+    </div>
+
+    <!-- SAVED COMPARISONS -->
+    <div id="exSavedSection" style="display:none;margin-bottom:14px;">
+      <div class="panel">
+        <div class="panel-title">Saved Strategy Comparisons</div>
+        <div id="exSavedGrid" style="display:flex;flex-direction:column;gap:8px;"></div>
+      </div>
+    </div>
+
+    <!-- TRADE LOG -->
+    <div class="panel">
+      <div class="panel-title">All Trades <span id="exTradeCount" style="color:var(--text3);font-weight:400;font-size:.65rem;text-transform:none;letter-spacing:0;"></span></div>
+      <div style="display:flex;gap:8px;margin-bottom:8px;flex-wrap:wrap;">
+        <button onclick="exFilterTrades('all')" id="exFAll" style="padding:3px 10px;background:var(--blue2);color:#000;border:none;border-radius:3px;font-family:var(--mono);font-size:.65rem;cursor:pointer;">All</button>
+        <button onclick="exFilterTrades('loss')" id="exFLoss" style="padding:3px 10px;background:var(--bg3);color:var(--bear2);border:1px solid var(--bear2);border-radius:3px;font-family:var(--mono);font-size:.65rem;cursor:pointer;">Losses only</button>
+        <button onclick="exFilterTrades('win')" id="exFWin" style="padding:3px 10px;background:var(--bg3);color:var(--bull2);border:1px solid var(--bull2);border-radius:3px;font-family:var(--mono);font-size:.65rem;cursor:pointer;">Wins only</button>
+        <button onclick="exportExplorerCSV()" style="padding:3px 10px;background:var(--bg3);color:var(--text2);border:1px solid var(--border2);border-radius:3px;font-family:var(--mono);font-size:.65rem;cursor:pointer;margin-left:auto;">↓ CSV</button>
+      </div>
+      <div class="trade-row header" style="grid-template-columns:75px 60px 75px 75px 55px 65px 70px 55px 55px;">
+        <span>Date</span><span>Dir</span><span>Entry</span><span>Exit</span><span>Bars</span><span>P&L%</span><span>Result</span><span>1D J</span><span>K-D</span>
+      </div>
+      <div id="exTradeList" style="display:flex;flex-direction:column;gap:4px;max-height:400px;overflow-y:auto;margin-top:4px;"></div>
+    </div>
+
+  </div>
+
+</div><!-- /explorer -->
 
 </div><!-- /shell -->
 
@@ -1525,6 +1711,421 @@ document.querySelectorAll('.tab-btn').forEach(btn=>btn.addEventListener('click',
 }));
 
 function updateClock(){ document.getElementById('liveClock').textContent=new Date().toLocaleTimeString('en-US',{hour12:false}); }
+
+// ═══════════════════════════════════════════════════
+// STRATEGY EXPLORER ENGINE
+// ═══════════════════════════════════════════════════
+let exAllTrades=[];   // current run trades (with full context)
+let exSavedResults=JSON.parse(localStorage.getItem('kdj_explorer_saves')||'[]');
+
+// Build KDJ state at a specific 1H bar index for any timeframe candles+kdj
+function getStateAt(hi, tfCandles, tfKdj, barsPerTf){
+  const idx = Math.min(Math.floor(hi/barsPerTf), tfKdj.length-1);
+  if(!tfKdj[idx]) return {k:50,d:50,j:50,dir:'neutral',gap:0};
+  const {k,d,j}=tfKdj[idx];
+  return {k,d,j,dir:k>d?'bull':'bear',gap:Math.abs(k-d)};
+}
+
+function getIdxForBar(hi, tfCandles){
+  // binary search by timestamp
+  const tMs=tfCandles[Math.min(hi, tfCandles.length-1)]?.t||0;
+  let lo=0,hi2=tfCandles.length-1,best=0;
+  while(lo<=hi2){const mid=Math.floor((lo+hi2)/2);if(tfCandles[mid].t<=tMs){best=mid;lo=mid+1;}else hi2=mid-1;}
+  return best;
+}
+
+async function runExplorer(){
+  const days      = parseInt(document.getElementById('exPeriod').value);
+  const alignment = document.getElementById('exAlignment').value;
+  const entryTrig = document.getElementById('exEntryTrigger').value;
+  const btcMode   = document.getElementById('exBtcMode').value;
+  const tp1Pct    = parseFloat(document.getElementById('exTp1').value)/100;
+  const tp2Pct    = parseFloat(document.getElementById('exTp2').value)/100;
+  const slPct     = parseFloat(document.getElementById('exSl').value)/100;
+  const maxHold   = parseInt(document.getElementById('exMaxHold').value)||336;
+  const lev       = parseInt(document.getElementById('exLev').value);
+  const minJ      = parseFloat(document.getElementById('exMinJ').value)||0;
+  const maxJ      = parseFloat(document.getElementById('exMaxJ').value)||100;
+  const minKDGap  = parseFloat(document.getElementById('exMinKDGap').value)||0;
+
+  const el=id=>document.getElementById(id);
+  el('exProgress').style.display='block';
+  el('exResults').style.display='none';
+  el('runExplorer').disabled=true;
+  el('exProgressFill').style.width='0%';
+  el('exProgressText').textContent='Fetching XRP candles from Binance...';
+
+  try{
+    // Fetch XRP + BTC 1H historical data
+    const c1h = await fetchHistoricalKlinesSymbol('XRPUSDT', days, n=>{
+      el('exProgressFill').style.width=Math.min(35,(n/(days*24))*35)+'%';
+      el('exProgressText').textContent=`XRP: ${n} candles loaded...`;
+    });
+    el('exProgressText').textContent='Fetching BTC candles...';
+    const btcC1h = await fetchHistoricalKlinesSymbol('BTCUSDT', days, n=>{
+      el('exProgressFill').style.width=Math.min(65,35+(n/(days*24))*30)+'%';
+      el('exProgressText').textContent=`BTC: ${n} candles loaded...`;
+    });
+
+    if(c1h.length<100){el('exProgressText').textContent='Not enough data.';el('runExplorer').disabled=false;return;}
+
+    el('exProgressFill').style.width='70%';
+    el('exProgressText').textContent='Building timeframe data...';
+    await new Promise(r=>setTimeout(r,0));
+
+    // Build all timeframes calendar-anchored
+    const xrp4h=aggrCalendar(c1h,4),  xrp1d=aggrCalendar(c1h,24),  xrp3d=aggrCalendar(c1h,72);
+    const btc4h=aggrCalendar(btcC1h,4),btc1d=aggrCalendar(btcC1h,24),btc3d=aggrCalendar(btcC1h,72);
+
+    const kdj1h =calcKDJ(c1h);
+    const kdj4h =calcKDJ(xrp4h);
+    const kdj1d =calcKDJ(xrp1d);
+    const kdj3d =calcKDJ(xrp3d);
+    const bkdj4h=calcKDJ(btc4h);
+    const bkdj1d=calcKDJ(btc1d);
+    const bkdj3d=calcKDJ(btc3d);
+
+    el('exProgressFill').style.width='80%';
+    el('exProgressText').textContent='Running strategy rules...';
+    await new Promise(r=>setTimeout(r,0));
+
+    const trades=[];
+    const len=Math.min(c1h.length, btcC1h.length);
+    let inTrade=false,entry=0,tradeDir='',openBar=0,entryDate='';
+    let last3dIdx=-1,last3dDir=null,armed=false,tradeUsed=false;
+
+    for(let hi=200;hi<len;hi++){
+      const tMs=c1h[hi].t;
+      const i4h=getIdx(tMs,4,xrp4h);
+      const i1d=getIdx(tMs,24,xrp1d);
+      const i3d=getIdx(tMs,72,xrp3d);
+      if(i3d<2||i1d<2||i4h<2) continue;
+      if(!kdj3d[i3d]||!kdj1d[i1d]||!kdj4h[i4h]||!kdj1h[hi]) continue;
+
+      const s3d={k:kdj3d[i3d].k,d:kdj3d[i3d].d,j:kdj3d[i3d].j,dir:kdj3d[i3d].k>kdj3d[i3d].d?'bull':'bear',gap:Math.abs(kdj3d[i3d].k-kdj3d[i3d].d)};
+      const s1d={k:kdj1d[i1d].k,d:kdj1d[i1d].d,j:kdj1d[i1d].j,dir:kdj1d[i1d].k>kdj1d[i1d].d?'bull':'bear',gap:Math.abs(kdj1d[i1d].k-kdj1d[i1d].d)};
+      const s4h={k:kdj4h[i4h].k,d:kdj4h[i4h].d,j:kdj4h[i4h].j,dir:kdj4h[i4h].k>kdj4h[i4h].d?'bull':'bear',gap:Math.abs(kdj4h[i4h].k-kdj4h[i4h].d)};
+      const s1h={k:kdj1h[hi].k,d:kdj1h[hi].d,j:kdj1h[hi].j,dir:kdj1h[hi].k>kdj1h[hi].d?'bull':'bear',gap:Math.abs(kdj1h[hi].k-kdj1h[hi].d)};
+
+      // BTC state
+      const bTms=btcC1h[Math.min(hi,btcC1h.length-1)].t;
+      const bi4h=getIdx(bTms,4,btc4h),bi1d=getIdx(bTms,24,btc1d),bi3d=getIdx(bTms,72,btc3d);
+      const bs3d=bkdj3d[bi3d]?{dir:bkdj3d[bi3d].k>bkdj3d[bi3d].d?'bull':'bear'}:{dir:'neutral'};
+      const bs1d=bkdj1d[bi1d]?{dir:bkdj1d[bi1d].k>bkdj1d[bi1d].d?'bull':'bear'}:{dir:'neutral'};
+      const bs4h=bkdj4h[bi4h]?{dir:bkdj4h[bi4h].k>bkdj4h[bi4h].d?'bull':'bear'}:{dir:'neutral'};
+
+      // ── ALIGNMENT CHECK based on rule ──
+      let aligned=false;
+      const dir3d=s3d.dir, dir1d=s1d.dir, dir4h=s4h.dir;
+      if(alignment==='3d_1d_4h') aligned=dir3d===dir1d&&dir1d===dir4h;
+      else if(alignment==='3d_1d') aligned=dir3d===dir1d;
+      else if(alignment==='1d_4h') aligned=dir1d===dir4h;
+      else if(alignment==='3d_only') aligned=true; // just need 3D cross below
+
+      // Reference direction from dominant TF
+      const domDir=alignment==='1d_4h'?dir1d:dir3d;
+
+      // ── BTC FILTER ──
+      let btcOk=true;
+      if(btcMode==='3d_1d_4h') btcOk=bs3d.dir===domDir&&bs1d.dir===domDir&&bs4h.dir===domDir;
+      else if(btcMode==='3d_only') btcOk=bs3d.dir===domDir;
+
+      // ── ARM ON 3D CROSS (or 1D cross if alignment is 1d_4h) ──
+      const armTF=alignment==='1d_4h'?'1d':'3d';
+      const armKdj=armTF==='3d'?kdj3d:kdj1d;
+      const armIdx=armTF==='3d'?i3d:i1d;
+      if(armIdx!==last3dIdx){
+        const cross=detectCross(armKdj,armIdx);
+        if(cross){armed=true;tradeUsed=false;last3dDir=domDir;}
+        if(last3dDir&&domDir!==last3dDir){tradeUsed=false;last3dDir=domDir;}
+        last3dIdx=armIdx;
+      }
+
+      if(inTrade){
+        const isLong=tradeDir==='bull';
+        const tp1=isLong?entry*(1+tp1Pct):entry*(1-tp1Pct);
+        const tp2=isLong?entry*(1+tp2Pct):entry*(1-tp2Pct);
+        const sl=isLong?entry*(1-slPct):entry*(1+slPct);
+        let outcome=null,exitP=0;
+        if(isLong&&c1h[hi].l<=sl){outcome='LOSS';exitP=sl;}
+        if(!isLong&&c1h[hi].h>=sl){outcome='LOSS';exitP=sl;}
+        if(!outcome&&isLong&&c1h[hi].h>=tp2){outcome='WIN';exitP=tp2;}
+        if(!outcome&&!isLong&&c1h[hi].l<=tp2){outcome='WIN';exitP=tp2;}
+        if(!outcome&&isLong&&c1h[hi].h>=tp1){outcome='PARTIAL';exitP=tp1;}
+        if(!outcome&&!isLong&&c1h[hi].l<=tp1){outcome='PARTIAL';exitP=tp1;}
+        if(!outcome&&(hi-openBar)>=maxHold){outcome='TIMEOUT';exitP=c1h[hi].c;}
+        if(outcome){
+          const raw=isLong?(exitP-entry)/entry*100:(entry-exitP)/entry*100;
+          const pnl=raw*lev;
+          const date=new Date(c1h[hi].t).toLocaleDateString('en-GB',{day:'2-digit',month:'short',year:'2-digit'});
+          // Capture state at EXIT for analysis
+          const ex1d={k:kdj1d[i1d].k,d:kdj1d[i1d].d,j:kdj1d[i1d].j,gap:Math.abs(kdj1d[i1d].k-kdj1d[i1d].d)};
+          trades.push({date,entryDate,dir:tradeDir,entry,exit:exitP,bars:hi-openBar,raw,pnl,outcome,
+            // Entry context
+            entry1dJ:trades._entry1dJ||50, entry1dGap:trades._entry1dGap||0,
+            entry4hDir:trades._entry4hDir||'?', entryBtcDir:bs3d.dir,
+            // Exit context
+            exit1dJ:ex1d.j, exit1dGap:ex1d.gap,
+            exit1dDir:s1d.dir, exitBtcDir:bs3d.dir,
+          });
+          inTrade=false;
+        }
+      } else if(aligned&&btcOk&&armed&&!tradeUsed){
+        // ── ENTRY TRIGGER CHECK ──
+        let triggerFires=false;
+        if(entryTrig==='1h_cross'){
+          const c=detectCross(kdj1h,hi);
+          triggerFires=(domDir==='bull'&&c==='golden')||(domDir==='bear'&&c==='death');
+        } else if(entryTrig==='4h_cross'){
+          const c=detectCross(kdj4h,i4h);
+          triggerFires=(domDir==='bull'&&c==='golden')||(domDir==='bear'&&c==='death');
+        } else if(entryTrig==='1d_cross'){
+          const c=detectCross(kdj1d,i1d);
+          triggerFires=(domDir==='bull'&&c==='golden')||(domDir==='bear'&&c==='death');
+        } else if(entryTrig==='j_above_50'){
+          const prevJ=kdj1h[hi-1]?.j??50;
+          triggerFires=(domDir==='bull'&&prevJ<50&&s1h.j>=50)||(domDir==='bear'&&prevJ>50&&s1h.j<=50);
+        }
+
+        if(triggerFires){
+          // ── J FILTER ──
+          const j1d=s1d.j;
+          if(domDir==='bull'&&j1d<minJ) continue;
+          if(domDir==='bear'&&j1d>(100-minJ)) continue;
+          if(domDir==='bull'&&j1d>maxJ) continue;
+          if(domDir==='bear'&&j1d<(100-maxJ)) continue;
+          // ── K-D GAP FILTER ──
+          if(s1d.gap<minKDGap) continue;
+
+          entry=c1h[hi].c; tradeDir=domDir; inTrade=true; openBar=hi;
+          entryDate=new Date(c1h[hi].t).toLocaleDateString('en-GB',{day:'2-digit',month:'short',year:'2-digit'});
+          tradeUsed=true;
+          // Store entry context on trades array temporarily
+          trades._entry1dJ=s1d.j; trades._entry1dGap=s1d.gap;
+          trades._entry4hDir=s4h.dir; trades._entryBtcDir=bs3d.dir;
+        }
+      }
+    }
+
+    exAllTrades=trades;
+    el('exProgressFill').style.width='100%';
+    el('exProgressText').textContent=`✓ Done — ${trades.length} trades found`;
+
+    renderExplorerResults(trades, lev, days, alignment, entryTrig, btcMode, tp1Pct, tp2Pct, slPct, maxHold);
+    el('exResults').style.display='block';
+    el('exSaveBtn').style.display='inline-block';
+
+  }catch(e){
+    el('exProgressText').textContent='Error: '+e.message;
+    console.error('Explorer error:',e);
+  }
+  el('runExplorer').disabled=false;
+  setTimeout(()=>el('exProgress').style.display='none',3000);
+}
+
+function renderExplorerResults(trades, lev, days, alignment, entryTrig, btcMode, tp1Pct, tp2Pct, slPct, maxHold){
+  const el=id=>document.getElementById(id);
+  const wins=trades.filter(t=>t.outcome==='WIN');
+  const partial=trades.filter(t=>t.outcome==='PARTIAL');
+  const losses=trades.filter(t=>t.outcome==='LOSS');
+  const timeouts=trades.filter(t=>t.outcome==='TIMEOUT');
+  const wr=trades.length?((wins.length+partial.length)/trades.length*100):0;
+  const totalPnl=trades.reduce((a,t)=>a+t.pnl,0);
+  const winPnl=trades.filter(t=>t.pnl>0).reduce((a,t)=>a+t.pnl,0);
+  const lossPnl=Math.abs(trades.filter(t=>t.pnl<0).reduce((a,t)=>a+t.pnl,0));
+  const pf=lossPnl>0?(winPnl/lossPnl):winPnl>0?99:0;
+  const avgWin=wins.length?wins.reduce((a,t)=>a+t.pnl,0)/wins.length:0;
+  const avgLoss=losses.length?losses.reduce((a,t)=>a+t.pnl,0)/losses.length:0;
+  const avgHold=trades.length?Math.round(trades.reduce((a,t)=>a+t.bars,0)/trades.length):0;
+
+  // Stats grid
+  el('exStatsGrid').innerHTML=[
+    {label:'Trades',val:trades.length,cls:'blue',sub:`${days}d period`},
+    {label:'Win Rate',val:wr.toFixed(1)+'%',cls:wr>=60?'green':wr>=45?'amber':'red',sub:`${wins.length+partial.length}W / ${losses.length}L / ${timeouts.length}T`},
+    {label:'Profit Factor',val:pf.toFixed(2),cls:pf>=2?'green':pf>=1?'amber':'red',sub:'profit ÷ loss'},
+    {label:'Total P&L',val:(totalPnl>=0?'+':'')+totalPnl.toFixed(1)+'%',cls:totalPnl>=0?'green':'red',sub:`at ${lev}X · avg W:+${avgWin.toFixed(1)}% L:${avgLoss.toFixed(1)}%`},
+    {label:'Avg Hold',val:avgHold+'h',cls:'blue',sub:'hours per trade'},
+    {label:'Alignment',val:alignment.toUpperCase().replace(/_/g,'+'),cls:'amber',sub:'TF rule'},
+    {label:'Entry',val:entryTrig.replace(/_/g,' ').toUpperCase(),cls:'amber',sub:'trigger'},
+    {label:'BTC Filter',val:btcMode==='off'?'OFF':btcMode.toUpperCase().replace(/_/g,'+'),cls:btcMode!=='off'?'green':'amber',sub:'confirmation'},
+  ].map(s=>`<div class="stat-card"><div class="stat-label">${s.label}</div><div class="stat-value ${s.cls}">${s.val}</div><div class="stat-sub">${s.sub}</div></div>`).join('');
+
+  // Equity curve
+  let eq=100; const eqPts=[eq];
+  trades.forEach(t=>{eq=Math.max(0.1,eq*(1+t.pnl/100));eqPts.push(eq);});
+  drawExplorerCurve(eqPts);
+  el('exCurveTitle').textContent=`Equity Curve — ${alignment.toUpperCase().replace(/_/g+'+')} · ${entryTrig.replace(/_/g,' ')} · BTC:${btcMode}`;
+
+  // ── LOSS ANALYSIS ──
+  const badTrades=losses.concat(timeouts);
+  if(!badTrades.length){
+    el('exLossAnalysis').innerHTML='<span style="color:var(--bull2);">No losses! Consider if the sample size is large enough.</span>';
+  } else {
+    const avgLossJ  = badTrades.reduce((a,t)=>a+(t.exit1dJ||50),0)/badTrades.length;
+    const avgLossGap= badTrades.reduce((a,t)=>a+(t.exit1dGap||0),0)/badTrades.length;
+    const btcDiverge= badTrades.filter(t=>t.exitBtcDir&&t.dir&&t.exitBtcDir!==t.dir).length;
+    const longLoss  = losses.filter(t=>t.dir==='bull').length;
+    const shortLoss = losses.filter(t=>t.dir==='bear').length;
+    const longTotal = trades.filter(t=>t.dir==='bull').length;
+    const shortTotal= trades.filter(t=>t.dir==='bear').length;
+    const longLR    = longTotal?(longLoss/longTotal*100).toFixed(0):0;
+    const shortLR   = shortTotal?(shortLoss/shortTotal*100).toFixed(0):0;
+    const avgLossHold=badTrades.reduce((a,t)=>a+t.bars,0)/badTrades.length;
+    const quickLoss = badTrades.filter(t=>t.bars<24).length;
+    const slowLoss  = badTrades.filter(t=>t.bars>120).length;
+
+    el('exLossAnalysis').innerHTML=`
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px;">
+        <div style="background:var(--bg3);padding:10px;border-radius:6px;">
+          <b style="color:var(--bear2);">Long vs Short Loss Rate</b><br>
+          ▲ Longs: ${longLoss}/${longTotal} lost (${longLR}%)<br>
+          ▼ Shorts: ${shortLoss}/${shortTotal} lost (${shortLR}%)<br>
+          <span style="color:var(--text3);font-size:.65rem;">${parseFloat(longLR)>parseFloat(shortLR)?'Longs losing more — market may be in downtrend':'Shorts losing more — market may be in uptrend'}</span>
+        </div>
+        <div style="background:var(--bg3);padding:10px;border-radius:6px;">
+          <b style="color:var(--bear2);">When losses happened</b><br>
+          Quick losses (&lt;24h): ${quickLoss}<br>
+          Slow losses (&gt;120h): ${slowLoss}<br>
+          <span style="color:var(--text3);font-size:.65rem;">${quickLoss>slowLoss?'Most losses hit SL fast — price rejected immediately. Try wider SL or stricter entry filter.':'Most losses dragged on — price stalled then reversed. Patience setting may be too long.'}</span>
+        </div>
+        <div style="background:var(--bg3);padding:10px;border-radius:6px;">
+          <b style="color:var(--bear2);">1D J at exit on losses</b><br>
+          Avg J at loss exit: <b>${avgLossJ.toFixed(1)}</b><br>
+          Avg K-D gap: <b>${avgLossGap.toFixed(1)}</b><br>
+          <span style="color:var(--text3);font-size:.65rem;">${avgLossJ>60?'J was high at loss — entries happening near exhaustion. Try lowering Max J filter.':avgLossJ<40?'J was low at loss — trend was already weakening at entry. Raise Min K-D Gap filter.':'J was mid-range at loss — losses may be unavoidable noise.'}</span>
+        </div>
+        <div style="background:var(--bg3);padding:10px;border-radius:6px;">
+          <b style="color:var(--bear2);">BTC divergence at exit</b><br>
+          Losses where BTC disagreed: <b>${btcDiverge}</b> / ${badTrades.length}<br>
+          <span style="color:var(--text3);font-size:.65rem;">${btcDiverge>badTrades.length*0.5?'BTC was diverging on most losses — BTC filter would have helped significantly.':btcMode!=='off'?'BTC filter already active. Losses happening even with BTC agreement.':'BTC divergence minor factor here.'}</span>
+        </div>
+      </div>
+      <div style="background:rgba(255,45,85,.05);border:1px solid rgba(255,45,85,.2);border-radius:6px;padding:10px;font-size:.72rem;">
+        <b style="color:var(--amber);">💡 Suggested improvements based on this analysis:</b><br>
+        ${quickLoss>2?'• <b>Widen SL</b> — quick losses suggest you\'re getting stopped by wicks. Try SL at 4-5%.<br>':''}
+        ${avgLossJ>65?'• <b>Add Max J filter</b> — set Max J Entry to 75. Avoids entering when momentum is already extended.<br>':''}
+        ${avgLossGap<8&&minKDGap<5?'• <b>Raise Min K-D Gap</b> — try 8-10. Only enter when momentum is clearly established.<br>':''}
+        ${btcDiverge>badTrades.length*0.4&&btcMode==='off'?'• <b>Enable BTC filter</b> — BTC was diverging on many losses. BTC agreement would filter these out.<br>':''}
+        ${slowLoss>2?'• <b>Reduce Max Hold</b> — slow losses dragging. Try 168-240h instead of ${maxHold}h.<br>':''}
+        ${longLoss>shortLoss*1.5?'• <b>Consider LONG-only rule</b> — longs performing significantly worse.<br>':''}
+        ${parseFloat(pf.toFixed(2))<1?'• <b>Widen TP2</b> — profit factor below 1. Wins aren\'t covering losses. Try TP2 at 15-20%.<br>':''}
+        ${!quickLoss&&!avgLossJ&&!btcDiverge?'• Strategy looks solid. Run a longer period to validate with more trades.':''}
+      </div>`;
+  }
+
+  // ── WIN ANALYSIS ──
+  const goodTrades=wins.concat(partial);
+  if(!goodTrades.length){
+    el('exWinAnalysis').innerHTML='<span style="color:var(--bear2);">No wins yet. Adjust parameters and try again.</span>';
+  } else {
+    const avgWinJ   = goodTrades.reduce((a,t)=>a+(t.entry1dJ||50),0)/goodTrades.length;
+    const avgWinGap = goodTrades.reduce((a,t)=>a+(t.entry1dGap||0),0)/goodTrades.length;
+    const avgWinHold= Math.round(goodTrades.reduce((a,t)=>a+t.bars,0)/goodTrades.length);
+    const btcAgree  = goodTrades.filter(t=>t.entryBtcDir===t.dir).length;
+    const longWins  = goodTrades.filter(t=>t.dir==='bull').length;
+    const shortWins = goodTrades.filter(t=>t.dir==='bear').length;
+
+    el('exWinAnalysis').innerHTML=`
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+        <div style="background:var(--bg3);padding:10px;border-radius:6px;">
+          <b style="color:var(--bull2);">Entry conditions on wins</b><br>
+          Avg 1D J at entry: <b>${avgWinJ.toFixed(1)}</b><br>
+          Avg K-D gap at entry: <b>${avgWinGap.toFixed(1)}</b><br>
+          <span style="color:var(--text3);font-size:.65rem;">J between 40-70 = sweet spot. Wide K-D = strong momentum.</span>
+        </div>
+        <div style="background:var(--bg3);padding:10px;border-radius:6px;">
+          <b style="color:var(--bull2);">Win breakdown</b><br>
+          ▲ Long wins: <b>${longWins}</b> · ▼ Short wins: <b>${shortWins}</b><br>
+          Avg hold on wins: <b>${avgWinHold}h</b><br>
+          BTC agreed on entry: <b>${btcAgree}/${goodTrades.length}</b>
+        </div>
+      </div>`;
+  }
+
+  // Trade list
+  exFilterTrades('all');
+}
+
+let _exFilterMode='all';
+function exFilterTrades(mode){
+  _exFilterMode=mode;
+  const all=['All','Losses only','Wins only'];
+  ['exFAll','exFLoss','exFWin'].forEach((id,i)=>{
+    const btn=document.getElementById(id);
+    btn.style.background=i===(['all','loss','win'].indexOf(mode))?'var(--blue2)':'var(--bg3)';
+    btn.style.color=i===(['all','loss','win'].indexOf(mode))?'#000':['var(--text2)','var(--bear2)','var(--bull2)'][i];
+  });
+  let trades=exAllTrades;
+  if(mode==='loss') trades=trades.filter(t=>t.outcome==='LOSS'||t.outcome==='TIMEOUT');
+  if(mode==='win')  trades=trades.filter(t=>t.outcome==='WIN'||t.outcome==='PARTIAL');
+  document.getElementById('exTradeCount').textContent=`— ${trades.length} trades`;
+  document.getElementById('exTradeList').innerHTML=trades.length?trades.slice().reverse().map(t=>`
+    <div style="display:grid;grid-template-columns:75px 60px 75px 75px 55px 65px 70px 55px 55px;gap:4px;align-items:center;padding:6px 8px;border-radius:4px;font-size:.68rem;background:var(--bg2);border:1px solid var(--border);border-left:2px solid ${t.pnl>=0?'var(--bull2)':'var(--bear2)'};">
+      <span>${t.date}</span>
+      <span style="color:${t.dir==='bull'?'var(--bull2)':'var(--bear2)'};font-weight:700;">${t.dir==='bull'?'▲L':'▼S'}</span>
+      <span>$${t.entry.toFixed(4)}</span>
+      <span>$${t.exit.toFixed(4)}</span>
+      <span>${t.bars}h</span>
+      <span style="color:${t.pnl>=0?'var(--bull2)':'var(--bear2)'};font-weight:600;">${t.pnl>=0?'+':''}${t.pnl.toFixed(1)}%</span>
+      <span style="color:${t.outcome==='WIN'?'var(--bull2)':t.outcome==='LOSS'?'var(--bear2)':'var(--amber)'};">${t.outcome}</span>
+      <span style="color:var(--text3);">${t.exit1dJ?.toFixed(0)||'—'}</span>
+      <span style="color:var(--text3);">${t.exit1dGap?.toFixed(0)||'—'}</span>
+    </div>`).join(''):'<div style="color:var(--text3);text-align:center;padding:20px;font-size:.75rem;">No trades match this filter.</div>';
+}
+
+function drawExplorerCurve(pts){
+  const svg=document.getElementById('exEquitySvg');
+  if(!svg) return;
+  const w=svg.clientWidth||600,h=120,min=Math.min(...pts),max=Math.max(...pts),range=max-min||1;
+  const px=i=>(i/(pts.length-1))*(w-20)+10;
+  const py=v=>h-10-((v-min)/range)*(h-20);
+  let path='M'+px(0)+','+py(pts[0]);
+  pts.forEach((v,i)=>{if(i>0) path+=' L'+px(i)+','+py(v);});
+  const fill=path+' L'+px(pts.length-1)+','+(h-10)+' L'+px(0)+','+(h-10)+' Z';
+  const color=pts[pts.length-1]>=pts[0]?'#00e87a':'#ff2d55';
+  svg.innerHTML=`<defs><linearGradient id="exG" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="${color}" stop-opacity=".25"/><stop offset="100%" stop-color="${color}" stop-opacity="0"/></linearGradient></defs><path d="${fill}" fill="url(#exG)"/><path d="${path}" fill="none" stroke="${color}" stroke-width="1.5"/><line x1="10" y1="${py(pts[0])}" x2="${w-10}" y2="${py(pts[0])}" stroke="var(--border2)" stroke-width="1" stroke-dasharray="3,3"/><text x="${w-50}" y="${py(pts[pts.length-1])-4}" fill="${color}" font-size="9" font-family="JetBrains Mono">${pts[pts.length-1].toFixed(0)}%</text>`;
+}
+
+function saveExplorerResult(){
+  if(!exAllTrades.length) return;
+  const wins=exAllTrades.filter(t=>t.outcome==='WIN'||t.outcome==='PARTIAL').length;
+  const wr=(wins/Math.max(exAllTrades.length,1)*100).toFixed(1);
+  const pnl=exAllTrades.reduce((a,t)=>a+t.pnl,0).toFixed(1);
+  const label=`${document.getElementById('exAlignment').value} · ${document.getElementById('exEntryTrigger').value} · BTC:${document.getElementById('exBtcMode').value} · SL:${document.getElementById('exSl').value}% TP2:${document.getElementById('exTp2').value}%`;
+  exSavedResults.unshift({label,trades:exAllTrades.length,wr,pnl,ts:Date.now()});
+  if(exSavedResults.length>10) exSavedResults.length=10;
+  localStorage.setItem('kdj_explorer_saves', JSON.stringify(exSavedResults));
+  renderSavedResults();
+  document.getElementById('exSaveBtn').textContent='★ SAVED';
+  setTimeout(()=>document.getElementById('exSaveBtn').textContent='★ SAVE THIS RESULT',2000);
+}
+
+function renderSavedResults(){
+  if(!exSavedResults.length){ document.getElementById('exSavedSection').style.display='none'; return; }
+  document.getElementById('exSavedSection').style.display='block';
+  document.getElementById('exSavedGrid').innerHTML=exSavedResults.map((r,i)=>`
+    <div style="background:var(--bg3);border:1px solid var(--border);border-radius:6px;padding:10px 12px;font-size:.72rem;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;">
+      <span style="color:var(--text2);flex:1;">${r.label}</span>
+      <span style="color:var(--blue2);">${r.trades} trades</span>
+      <span style="color:${parseFloat(r.wr)>=55?'var(--bull2)':'var(--amber)'};">${r.wr}% WR</span>
+      <span style="color:${parseFloat(r.pnl)>=0?'var(--bull2)':'var(--bear2)'};">${parseFloat(r.pnl)>=0?'+':''}${r.pnl}% P&L</span>
+      <button onclick="exSavedResults.splice(${i},1);localStorage.setItem('kdj_explorer_saves',JSON.stringify(exSavedResults));renderSavedResults();" style="background:none;border:none;color:var(--text3);cursor:pointer;font-size:.65rem;">✕</button>
+    </div>`).join('');
+}
+
+function exportExplorerCSV(){
+  if(!exAllTrades.length){ alert('Run a test first.'); return; }
+  const rows=[['Date','Dir','Entry','Exit','Bars','RawPnl%','Pnl%Lev','Outcome','Exit1DJ','ExitKDGap','ExitBtcDir']];
+  exAllTrades.forEach(t=>rows.push([t.date,t.dir,t.entry,t.exit,t.bars,t.raw?.toFixed(2),t.pnl?.toFixed(2),t.outcome,t.exit1dJ?.toFixed(1)||'',t.exit1dGap?.toFixed(1)||'',t.exitBtcDir||'']));
+  const csv=rows.map(r=>r.map(v=>'"'+String(v||'').replace(/"/g,'""')+'"').join(',')).join('\n');
+  const a=document.createElement('a');
+  a.href='data:text/csv;charset=utf-8,'+encodeURIComponent(csv);
+  a.download='kdj-explorer-'+new Date().toISOString().slice(0,10)+'.csv';
+  a.click();
+}
+
+// Load saved results on init
+renderSavedResults();
 
 // ═══════════════════════════════════════════════════
 // INIT
