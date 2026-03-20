@@ -580,54 +580,87 @@ body::before{content:'';position:fixed;inset:0;background:repeating-linear-gradi
 <!-- SETTINGS TAB -->
 <div class="content" id="tab-settings">
 
-  <!-- TELEGRAM -->
-  <div class="panel" style="margin-bottom:14px;border-color:rgba(74,158,255,.3);">
-    <div class="panel-title" style="color:var(--blue2);">📱 Telegram Notifications</div>
+  <!-- TELEGRAM PANEL -->
+  <div style="background:var(--bg2);border:1px solid rgba(74,158,255,.3);border-radius:10px;padding:16px;margin-bottom:14px;width:100%;">
 
-    <div style="font-size:.72rem;color:var(--text2);margin-bottom:14px;line-height:1.6;">
-      Your bot token and chat ID are saved <b>only on this device</b> in your browser storage. They never appear in the page source and nobody else can see them.
+    <!-- Header -->
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px;">
+      <span style="font-size:1.1rem;">📱</span>
+      <span style="font-family:var(--sans);font-weight:700;color:var(--blue2);font-size:.9rem;text-transform:uppercase;letter-spacing:.5px;">Telegram Notifications</span>
+      <div id="tgStatusDot" style="width:8px;height:8px;border-radius:50%;background:var(--text3);margin-left:auto;"></div>
     </div>
 
-    <div style="display:flex;flex-direction:column;gap:10px;">
-      <div>
-        <label class="bt-label">Bot Token</label>
-        <input id="tgToken" type="password" class="bt-input" style="width:100%;" placeholder="123456789:ABCdef..." autocomplete="off"/>
-        <div style="font-size:.62rem;color:var(--text3);margin-top:3px;">From @BotFather. Stored locally, never in the code.</div>
-      </div>
-      <div>
-        <label class="bt-label">Your Chat ID</label>
-        <input id="tgChatId" type="text" class="bt-input" style="width:100%;" placeholder="737503095" autocomplete="off"/>
-        <div style="font-size:.62rem;color:var(--text3);margin-top:3px;">Your personal Telegram user ID.</div>
-      </div>
-      <div style="display:flex;gap:10px;flex-wrap:wrap;">
-        <button onclick="saveTgSettings()" style="padding:8px 20px;background:var(--blue2);color:#000;border:none;border-radius:5px;font-family:var(--mono);font-size:.78rem;font-weight:700;cursor:pointer;">💾 Save</button>
-        <button onclick="testTelegram()" style="padding:8px 20px;background:var(--bg3);border:1px solid var(--blue2);color:var(--blue2);border-radius:5px;font-family:var(--mono);font-size:.78rem;cursor:pointer;">📤 Send Test Message</button>
-        <button onclick="clearTgSettings()" style="padding:8px 16px;background:var(--bg3);border:1px solid var(--border);color:var(--bear2);border-radius:5px;font-family:var(--mono);font-size:.78rem;cursor:pointer;">✕ Clear</button>
-      </div>
-      <div id="tgStatus" style="font-size:.72rem;padding:8px 12px;border-radius:5px;display:none;"></div>
+    <!-- Security note -->
+    <div style="background:rgba(74,158,255,.06);border:1px solid rgba(74,158,255,.15);border-radius:6px;padding:10px 12px;margin-bottom:14px;font-size:.7rem;color:var(--text2);line-height:1.6;">
+      🔒 Token and Chat ID saved <b style="color:var(--text);">only on this device</b>. Never visible in source code.
     </div>
+
+    <!-- Inputs -->
+    <div style="display:flex;flex-direction:column;gap:10px;margin-bottom:14px;">
+      <div>
+        <div style="font-size:.62rem;color:var(--text3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:5px;">Bot Token</div>
+        <input id="tgToken" type="password" style="width:100%;background:var(--bg3);border:1px solid var(--border2);color:var(--text);padding:10px 12px;border-radius:6px;font-family:var(--mono);font-size:.78rem;outline:none;box-sizing:border-box;" placeholder="Paste from @BotFather..." autocomplete="off"/>
+      </div>
+      <div>
+        <div style="font-size:.62rem;color:var(--text3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:5px;">Your Chat ID</div>
+        <input id="tgChatId" type="text" style="width:100%;background:var(--bg3);border:1px solid var(--border2);color:var(--text);padding:10px 12px;border-radius:6px;font-family:var(--mono);font-size:.78rem;outline:none;box-sizing:border-box;" placeholder="e.g. 737503095" autocomplete="off"/>
+      </div>
+    </div>
+
+    <!-- Buttons row -->
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px;">
+      <button onclick="saveTgSettings()" style="padding:10px;background:var(--blue2);color:#000;border:none;border-radius:6px;font-family:var(--mono);font-size:.75rem;font-weight:700;cursor:pointer;width:100%;">💾 Save</button>
+      <button onclick="testTelegram()" style="padding:10px;background:var(--bg3);border:1px solid var(--blue2);color:var(--blue2);border-radius:6px;font-family:var(--mono);font-size:.75rem;cursor:pointer;width:100%;">📤 Test</button>
+    </div>
+    <button onclick="clearTgSettings()" style="width:100%;padding:8px;background:var(--bg3);border:1px solid rgba(255,45,85,.3);color:var(--bear2);border-radius:6px;font-family:var(--mono);font-size:.72rem;cursor:pointer;">✕ Clear saved credentials</button>
+
+    <!-- Status message -->
+    <div id="tgStatus" style="display:none;margin-top:10px;font-size:.72rem;padding:8px 12px;border-radius:5px;"></div>
+
+    <!-- Connection status -->
+    <div id="tgStatusPanel" style="margin-top:10px;font-size:.7rem;color:var(--text3);text-align:center;padding:6px;border-radius:4px;background:var(--bg3);">Not configured</div>
   </div>
 
-  <!-- WHICH ALERTS TO SEND -->
-  <div class="panel" style="margin-bottom:14px;">
-    <div class="panel-title">Which alerts to send to Telegram</div>
-    <div style="display:flex;flex-direction:column;gap:8px;font-size:.75rem;">
-      <label style="display:flex;align-items:center;gap:10px;cursor:pointer;"><input type="checkbox" id="tgAlertT1" checked style="width:14px;height:14px;"> <span>⚡ Tier 1 — XRP signal fires (no BTC yet)</span></label>
-      <label style="display:flex;align-items:center;gap:10px;cursor:pointer;"><input type="checkbox" id="tgAlertT2" checked style="width:14px;height:14px;"> <span>🚀 Tier 2 — XRP + BTC both agree (full conviction)</span></label>
-      <label style="display:flex;align-items:center;gap:10px;cursor:pointer;"><input type="checkbox" id="tgAlertLock" checked style="width:14px;height:14px;"> <span>🔒 Trade locked — entry price, TP1, TP2, SL</span></label>
-      <label style="display:flex;align-items:center;gap:10px;cursor:pointer;"><input type="checkbox" id="tgAlertTp1" checked style="width:14px;height:14px;"> <span>✅ TP1 hit — take partial profit</span></label>
-      <label style="display:flex;align-items:center;gap:10px;cursor:pointer;"><input type="checkbox" id="tgAlertTp2" checked style="width:14px;height:14px;"> <span>🏆 TP2 hit — full target reached</span></label>
-      <label style="display:flex;align-items:center;gap:10px;cursor:pointer;"><input type="checkbox" id="tgAlertSl" checked style="width:14px;height:14px;"> <span>🛑 Stop loss hit — exit now</span></label>
-      <label style="display:flex;align-items:center;gap:10px;cursor:pointer;"><input type="checkbox" id="tgAlertExit" checked style="width:14px;height:14px;"> <span>⚠️ Exit warning — 1D cross forming, J turning</span></label>
-      <label style="display:flex;align-items:center;gap:10px;cursor:pointer;"><input type="checkbox" id="tgAlert3D" style="width:14px;height:14px;"> <span>📡 3D cross detected — system armed</span></label>
-    </div>
-    <button onclick="saveTgAlertPrefs()" style="margin-top:12px;padding:6px 16px;background:var(--bg3);border:1px solid var(--border2);color:var(--text);border-radius:5px;font-family:var(--mono);font-size:.75rem;cursor:pointer;">Save alert preferences</button>
-  </div>
+  <!-- ALERT PREFERENCES -->
+  <div style="background:var(--bg2);border:1px solid var(--border);border-radius:10px;padding:16px;margin-bottom:14px;width:100%;">
+    <div style="font-family:var(--sans);font-weight:700;color:var(--text);font-size:.85rem;margin-bottom:12px;">Which alerts to send</div>
 
-  <!-- STATUS -->
-  <div class="panel">
-    <div class="panel-title">Telegram Status</div>
-    <div id="tgStatusPanel" style="font-size:.75rem;color:var(--text3);">Not configured. Add your bot token and chat ID above.</div>
+    <div style="display:flex;flex-direction:column;gap:0;">
+      <label style="display:flex;align-items:center;justify-content:space-between;padding:10px 0;border-bottom:1px solid var(--border);cursor:pointer;">
+        <span style="font-size:.75rem;color:var(--text);">⚡ Tier 1 — XRP signal only</span>
+        <input type="checkbox" id="tgAlertT1" checked style="width:18px;height:18px;cursor:pointer;accent-color:var(--blue2);flex-shrink:0;">
+      </label>
+      <label style="display:flex;align-items:center;justify-content:space-between;padding:10px 0;border-bottom:1px solid var(--border);cursor:pointer;">
+        <span style="font-size:.75rem;color:var(--text);">🚀 Tier 2 — XRP + BTC agree</span>
+        <input type="checkbox" id="tgAlertT2" checked style="width:18px;height:18px;cursor:pointer;accent-color:var(--blue2);flex-shrink:0;">
+      </label>
+      <label style="display:flex;align-items:center;justify-content:space-between;padding:10px 0;border-bottom:1px solid var(--border);cursor:pointer;">
+        <span style="font-size:.75rem;color:var(--text);">🔒 Trade locked (entry/TP/SL)</span>
+        <input type="checkbox" id="tgAlertLock" checked style="width:18px;height:18px;cursor:pointer;accent-color:var(--blue2);flex-shrink:0;">
+      </label>
+      <label style="display:flex;align-items:center;justify-content:space-between;padding:10px 0;border-bottom:1px solid var(--border);cursor:pointer;">
+        <span style="font-size:.75rem;color:var(--text);">✅ TP1 hit — take partial profit</span>
+        <input type="checkbox" id="tgAlertTp1" checked style="width:18px;height:18px;cursor:pointer;accent-color:var(--bull2);flex-shrink:0;">
+      </label>
+      <label style="display:flex;align-items:center;justify-content:space-between;padding:10px 0;border-bottom:1px solid var(--border);cursor:pointer;">
+        <span style="font-size:.75rem;color:var(--text);">🏆 TP2 hit — full target</span>
+        <input type="checkbox" id="tgAlertTp2" checked style="width:18px;height:18px;cursor:pointer;accent-color:var(--bull2);flex-shrink:0;">
+      </label>
+      <label style="display:flex;align-items:center;justify-content:space-between;padding:10px 0;border-bottom:1px solid var(--border);cursor:pointer;">
+        <span style="font-size:.75rem;color:var(--text);">🛑 Stop loss hit — exit now</span>
+        <input type="checkbox" id="tgAlertSl" checked style="width:18px;height:18px;cursor:pointer;accent-color:var(--bear2);flex-shrink:0;">
+      </label>
+      <label style="display:flex;align-items:center;justify-content:space-between;padding:10px 0;border-bottom:1px solid var(--border);cursor:pointer;">
+        <span style="font-size:.75rem;color:var(--text);">⚠️ Exit warning — 1D forming</span>
+        <input type="checkbox" id="tgAlertExit" checked style="width:18px;height:18px;cursor:pointer;accent-color:var(--amber);flex-shrink:0;">
+      </label>
+      <label style="display:flex;align-items:center;justify-content:space-between;padding:10px 0;cursor:pointer;">
+        <span style="font-size:.75rem;color:var(--text);">📡 3D cross — system armed</span>
+        <input type="checkbox" id="tgAlert3D" style="width:18px;height:18px;cursor:pointer;accent-color:var(--blue2);flex-shrink:0;">
+      </label>
+    </div>
+
+    <button onclick="saveTgAlertPrefs()" style="width:100%;margin-top:12px;padding:10px;background:var(--bg3);border:1px solid var(--border2);color:var(--text);border-radius:6px;font-family:var(--mono);font-size:.75rem;cursor:pointer;">Save preferences</button>
   </div>
 
 </div><!-- /settings -->
@@ -2276,13 +2309,16 @@ function showTgStatus(msg, type){
 function updateTgStatusPanel(){
   const {token,chatId}=getTgConfig();
   const panel=document.getElementById('tgStatusPanel');
+  const dot=document.getElementById('tgStatusDot');
   if(!panel) return;
   if(token&&chatId){
     panel.style.color='var(--bull2)';
-    panel.textContent=`✓ Configured — Chat ID: ${chatId} · Token: ${'•'.repeat(8)}${token.slice(-4)}`;
+    panel.textContent=`✓ Connected · Chat ID: ${chatId}`;
+    if(dot){dot.style.background='var(--bull2)';dot.style.boxShadow='0 0 6px var(--bull2)';}
   } else {
     panel.style.color='var(--text3)';
-    panel.textContent='Not configured. Add your bot token and chat ID above.';
+    panel.textContent='Not configured — paste your token and chat ID above';
+    if(dot){dot.style.background='var(--text3)';dot.style.boxShadow='none';}
   }
 }
 
