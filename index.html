@@ -209,6 +209,7 @@ body::before{content:'';position:fixed;inset:0;background:repeating-linear-gradi
   <button class="tab-btn" data-tab="backtest">Backtest</button>
   <button class="tab-btn" data-tab="history">History</button>
   <button class="tab-btn" data-tab="explorer">Explorer</button>
+  <button class="tab-btn" data-tab="settings">⚙ Settings</button>
 </nav>
 
 <!-- MONITOR TAB -->
@@ -575,6 +576,61 @@ body::before{content:'';position:fixed;inset:0;background:repeating-linear-gradi
 
 </div><!-- /explorer -->
 
+<!-- SETTINGS TAB -->
+<div class="content" id="tab-settings">
+
+  <!-- TELEGRAM -->
+  <div class="panel" style="margin-bottom:14px;border-color:rgba(74,158,255,.3);">
+    <div class="panel-title" style="color:var(--blue2);">📱 Telegram Notifications</div>
+
+    <div style="font-size:.72rem;color:var(--text2);margin-bottom:14px;line-height:1.6;">
+      Your bot token and chat ID are saved <b>only on this device</b> in your browser storage. They never appear in the page source and nobody else can see them.
+    </div>
+
+    <div style="display:flex;flex-direction:column;gap:10px;">
+      <div>
+        <label class="bt-label">Bot Token</label>
+        <input id="tgToken" type="password" class="bt-input" style="width:100%;" placeholder="123456789:ABCdef..." autocomplete="off"/>
+        <div style="font-size:.62rem;color:var(--text3);margin-top:3px;">From @BotFather. Stored locally, never in the code.</div>
+      </div>
+      <div>
+        <label class="bt-label">Your Chat ID</label>
+        <input id="tgChatId" type="text" class="bt-input" style="width:100%;" placeholder="737503095" autocomplete="off"/>
+        <div style="font-size:.62rem;color:var(--text3);margin-top:3px;">Your personal Telegram user ID.</div>
+      </div>
+      <div style="display:flex;gap:10px;flex-wrap:wrap;">
+        <button onclick="saveTgSettings()" style="padding:8px 20px;background:var(--blue2);color:#000;border:none;border-radius:5px;font-family:var(--mono);font-size:.78rem;font-weight:700;cursor:pointer;">💾 Save</button>
+        <button onclick="testTelegram()" style="padding:8px 20px;background:var(--bg3);border:1px solid var(--blue2);color:var(--blue2);border-radius:5px;font-family:var(--mono);font-size:.78rem;cursor:pointer;">📤 Send Test Message</button>
+        <button onclick="clearTgSettings()" style="padding:8px 16px;background:var(--bg3);border:1px solid var(--border);color:var(--bear2);border-radius:5px;font-family:var(--mono);font-size:.78rem;cursor:pointer;">✕ Clear</button>
+      </div>
+      <div id="tgStatus" style="font-size:.72rem;padding:8px 12px;border-radius:5px;display:none;"></div>
+    </div>
+  </div>
+
+  <!-- WHICH ALERTS TO SEND -->
+  <div class="panel" style="margin-bottom:14px;">
+    <div class="panel-title">Which alerts to send to Telegram</div>
+    <div style="display:flex;flex-direction:column;gap:8px;font-size:.75rem;">
+      <label style="display:flex;align-items:center;gap:10px;cursor:pointer;"><input type="checkbox" id="tgAlertT1" checked style="width:14px;height:14px;"> <span>⚡ Tier 1 — XRP signal fires (no BTC yet)</span></label>
+      <label style="display:flex;align-items:center;gap:10px;cursor:pointer;"><input type="checkbox" id="tgAlertT2" checked style="width:14px;height:14px;"> <span>🚀 Tier 2 — XRP + BTC both agree (full conviction)</span></label>
+      <label style="display:flex;align-items:center;gap:10px;cursor:pointer;"><input type="checkbox" id="tgAlertLock" checked style="width:14px;height:14px;"> <span>🔒 Trade locked — entry price, TP1, TP2, SL</span></label>
+      <label style="display:flex;align-items:center;gap:10px;cursor:pointer;"><input type="checkbox" id="tgAlertTp1" checked style="width:14px;height:14px;"> <span>✅ TP1 hit — take partial profit</span></label>
+      <label style="display:flex;align-items:center;gap:10px;cursor:pointer;"><input type="checkbox" id="tgAlertTp2" checked style="width:14px;height:14px;"> <span>🏆 TP2 hit — full target reached</span></label>
+      <label style="display:flex;align-items:center;gap:10px;cursor:pointer;"><input type="checkbox" id="tgAlertSl" checked style="width:14px;height:14px;"> <span>🛑 Stop loss hit — exit now</span></label>
+      <label style="display:flex;align-items:center;gap:10px;cursor:pointer;"><input type="checkbox" id="tgAlertExit" checked style="width:14px;height:14px;"> <span>⚠️ Exit warning — 1D cross forming, J turning</span></label>
+      <label style="display:flex;align-items:center;gap:10px;cursor:pointer;"><input type="checkbox" id="tgAlert3D" style="width:14px;height:14px;"> <span>📡 3D cross detected — system armed</span></label>
+    </div>
+    <button onclick="saveTgAlertPrefs()" style="margin-top:12px;padding:6px 16px;background:var(--bg3);border:1px solid var(--border2);color:var(--text);border-radius:5px;font-family:var(--mono);font-size:.75rem;cursor:pointer;">Save alert preferences</button>
+  </div>
+
+  <!-- STATUS -->
+  <div class="panel">
+    <div class="panel-title">Telegram Status</div>
+    <div id="tgStatusPanel" style="font-size:.75rem;color:var(--text3);">Not configured. Add your bot token and chat ID above.</div>
+  </div>
+
+</div><!-- /settings -->
+
 </div><!-- /shell -->
 
 <script>
@@ -919,6 +975,7 @@ function lockTrade(dir){
   addAlert(`🔒 Trade locked — ${isLong?'LONG':'SHORT'} entry $${ep.toFixed(4)} | TP1 $${activeTrade.tp1.toFixed(4)} | TP2 $${activeTrade.tp2.toFixed(4)} | SL $${activeTrade.sl.toFixed(4)}`,isLong?'bull':'bear','LOCK');
   // Record to history
   histOnLock(activeTrade.dir, activeTrade.entry, activeTrade.tp1, activeTrade.tp2, activeTrade.sl);
+  tgAlert('lock',`🔒 <b>TRADE LOCKED — ${isLong?'LONG ▲':'SHORT ▼'}</b>\n\n📍 Entry: <b>$${ep.toFixed(4)}</b>\n✅ TP1: $${activeTrade.tp1.toFixed(4)} (+5%)\n🏆 TP2: $${activeTrade.tp2.toFixed(4)} (+12%)\n🛑 SL:  $${activeTrade.sl.toFixed(4)} (-3%)\n\nR:R = 4:1`);
 }
 
 function resetTrade(){
@@ -971,6 +1028,7 @@ function renderTrade(){
     addAlert(`✅ TP1 HIT — ${isLong?'LONG':'SHORT'} at $${price.toFixed(4)}. Take 50% profit. Move SL to entry.`,isLong?'bull':'bear','TP1');
     playBeep('signal');
     if(Notification.permission==='granted') new Notification('✅ TP1 Hit!',{body:`${isLong?'LONG':'SHORT'} TP1 at $${price.toFixed(4)}. Take partial profit.`});
+    tgAlert('tp1',`✅ <b>TP1 HIT — ${isLong?'LONG ▲':'SHORT ▼'}</b>\n\nPrice: <b>$${price.toFixed(4)}</b>\nEntry was: $${t.entry.toFixed(4)}\nP&L: +${((isLong?(price-t.entry)/t.entry:(t.entry-price)/t.entry)*100).toFixed(2)}% raw\n\n💡 Take 50% profit now. Move SL to entry price. Hold rest for TP2.`);
     histRecord('trade_tp1',{dir:t.dir,entry:t.entry,exitPrice:price,outcome:'PARTIAL',hoursOpen:Math.round((Date.now()-t.lockedAt)/3600000),rawPnl:((isLong?(price-t.entry)/t.entry:(t.entry-price)/t.entry)*100).toFixed(2),d1J:tfData['1D']?.latest?.j?.toFixed(1),d1KDGap:Math.abs((tfData['1D']?.latest?.k||50)-(tfData['1D']?.latest?.d||50)).toFixed(1),label:'✅ TP1 Hit — trade still open'});
   }
   // SL hit
@@ -978,6 +1036,7 @@ function renderTrade(){
     addAlert(`🛑 STOP LOSS HIT — Exit at $${price.toFixed(4)}`,'bear','SL');
     playBeep('arm');
     if(Notification.permission==='granted') new Notification('🛑 Stop Loss Hit',{body:`Exit now at $${price.toFixed(4)}`});
+    tgAlert('sl',`🛑 <b>STOP LOSS HIT — ${isLong?'LONG ▲':'SHORT ▼'}</b>\n\nExit price: <b>$${price.toFixed(4)}</b>\nEntry was: $${t.entry.toFixed(4)}\nLoss: ${((isLong?(price-t.entry)/t.entry:(t.entry-price)/t.entry)*100).toFixed(2)}% raw\n\nTrade closed.`);
     histOnClose(t.dir,t.entry,price,'LOSS',Math.round((Date.now()-t.lockedAt)/3600000));
     resetTrade(); return;
   }
@@ -986,6 +1045,7 @@ function renderTrade(){
     addAlert(`🏆 TP2 HIT — Full target at $${price.toFixed(4)}. Close trade.`,'bull','TP2');
     playBeep('signal');
     if(Notification.permission==='granted') new Notification('🏆 TP2 Hit!',{body:`Full target at $${price.toFixed(4)}`});
+    tgAlert('tp2',`🏆 <b>TP2 HIT — FULL TARGET!</b>\n\n${isLong?'LONG ▲':'SHORT ▼'} trade complete\nExit: <b>$${price.toFixed(4)}</b>\nEntry was: $${t.entry.toFixed(4)}\nGain: +${((isLong?(price-t.entry)/t.entry:(t.entry-price)/t.entry)*100).toFixed(2)}% raw\n\n🎯 Close the trade. Well done.`);
     histOnClose(t.dir,t.entry,price,'WIN',Math.round((Date.now()-t.lockedAt)/3600000));
     resetTrade(); return;
   }
@@ -1010,11 +1070,13 @@ function renderTrade(){
   if(d1Flipped){
     vEl.style.background='var(--bear-bg)';vEl.style.borderColor='rgba(255,45,85,.4)';
     vEl.innerHTML=`<b style="color:var(--bear2)">🛑 CLOSE NOW — 1D Already Flipped</b><br>1D K crossed ${isLong?'below':'above'} D. Daily trend fully reversed. Exit immediately. ${t.tp1Hit?'TP1 was secured — close remainder.':'Minimise loss — exit now.'}<br><span style="color:var(--text3);font-size:.65rem;">Hours: ${hoursOpen}h · J: ${d1J.toFixed(1)} · K-D: ${kdGap.toFixed(1)}</span>`;
-    if(!t._closeAlertSent){t._closeAlertSent=true;addAlert(`🛑 CLOSE ${isLong?'LONG':'SHORT'} — 1D fully flipped. Exit immediately.`,'bear','EXIT');playBeep('arm');if(Notification.permission==='granted') new Notification('🛑 Close Now',{body:`1D flipped against your ${isLong?'LONG':'SHORT'} at $${price.toFixed(4)}`});}
+    if(!t._closeAlertSent){t._closeAlertSent=true;addAlert(`🛑 CLOSE ${isLong?'LONG':'SHORT'} — 1D fully flipped. Exit immediately.`,'bear','EXIT');playBeep('arm');if(Notification.permission==='granted') new Notification('🛑 Close Now',{body:`1D flipped against your ${isLong?'LONG':'SHORT'} at $${price.toFixed(4)}`});
+    tgAlert('exit',`🛑 <b>CLOSE POSITION NOW</b>\n\n1D KDJ fully flipped against your ${isLong?'LONG ▲':'SHORT ▼'}\nCurrent price: <b>$${price.toFixed(4)}</b>\nEntry was: $${t.entry.toFixed(4)}\n\n⚠️ Daily trend reversed. Exit immediately.`);}
   }else if(jTurning&&momentumWeak){
     vEl.style.background='var(--bear-bg)';vEl.style.borderColor='rgba(255,45,85,.3)';
     vEl.innerHTML=`<b style="color:var(--bear2)">⚠️ EXIT NOW — 1D Cross Forming</b><br>J turning ${isLong?'down':'up'} from ${prevD1J.toFixed(1)}→${d1J.toFixed(1)} AND K-D gap at ${kdGap.toFixed(1)}pts. Cross is forming — exit before it completes. ${t.tp1Hit?'✅ TP1 secured. Close remainder.':'Exit to protect capital.'}<br><span style="color:var(--text3);font-size:.65rem;">Hours: ${hoursOpen}h · TP2: ${tp2Prog}%</span>`;
-    if(!t._earlyExitSent){t._earlyExitSent=true;addAlert(`⚠️ EXIT ${isLong?'LONG':'SHORT'} — J turning + K-D ${kdGap.toFixed(1)}pts. 1D cross forming.`,'warn','EXIT');playBeep('arm');if(Notification.permission==='granted') new Notification('⚠️ Exit Now',{body:`J turning + K-D at ${kdGap.toFixed(1)}pts. Exit ${isLong?'LONG':'SHORT'} at $${price.toFixed(4)}`});}
+    if(!t._earlyExitSent){t._earlyExitSent=true;addAlert(`⚠️ EXIT ${isLong?'LONG':'SHORT'} — J turning + K-D ${kdGap.toFixed(1)}pts. 1D cross forming.`,'warn','EXIT');playBeep('arm');if(Notification.permission==='granted') new Notification('⚠️ Exit Now',{body:`J turning + K-D at ${kdGap.toFixed(1)}pts. Exit ${isLong?'LONG':'SHORT'} at $${price.toFixed(4)}`});
+    tgAlert('exit',`⚠️ <b>EXIT SIGNAL — ${isLong?'LONG ▲':'SHORT ▼'}</b>\n\n1D cross forming:\n• J line turning: ${prevD1J.toFixed(1)} → ${d1J.toFixed(1)}\n• K-D gap: ${kdGap.toFixed(1)}pts (below 8)\n\nCurrent price: <b>$${price.toFixed(4)}</b>\n\nGet out before the cross completes.`);}
   }else if(jTurning&&!momentumWeak){
     vEl.style.background='var(--amber-bg)';vEl.style.borderColor='rgba(245,166,35,.3)';
     vEl.innerHTML=`<b style="color:var(--amber)">⚡ WATCH — J Turning, Gap Still OK</b><br>J turning ${isLong?'lower':'higher'}: ${prevD1J.toFixed(1)}→${d1J.toFixed(1)}. K-D gap ${kdGap.toFixed(1)}pts still healthy. Exit if gap drops below 8.<br><span style="color:var(--text3);font-size:.65rem;">Hours: ${hoursOpen}h · TP2: ${tp2Prog}%</span>`;
@@ -1117,6 +1179,7 @@ async function fetchAndRender(){
       playBeep('xrp');
       addAlert(`⚡ XRP SIGNAL — ${dir2} at $${currentPrice.toFixed(4)}. Waiting for BTC confirmation.`,allBull2?'bull':'bear','XRP');
       if(Notification.permission==='granted') new Notification('⚡ XRP Signal',{body:`${dir2} — XRP aligned at $${currentPrice.toFixed(4)}. Wait for BTC.`});
+      tgAlert('t1',`⚡ <b>XRP SIGNAL — ${dir2}</b>\n\nXRP 3D+1D+4H aligned + 1H cross\nPrice: <b>$${currentPrice.toFixed(4)}</b>\n\nBTC not yet confirmed. Wait for Tier 2 before entering.`);
       if(!activeTrade) lockTrade(allBull2?'bull':'bear');
     }
     lastXrpSignalState=xrpSignal;
@@ -1125,6 +1188,7 @@ async function fetchAndRender(){
       playBeep('signal');
       addAlert(`🚀 HIGH CONVICTION ${dir2} — XRP+BTC both agree at $${currentPrice.toFixed(4)}. Full entry!`,allBull2?'bull':'bear','ALL');
       if(Notification.permission==='granted') new Notification('🚀 HIGH CONVICTION',{body:`${dir2} — XRP+BTC aligned at $${currentPrice.toFixed(4)}. Enter now.`});
+      tgAlert('t2',`🚀 <b>HIGH CONVICTION — ${dir2}</b>\n\nXRP + BTC both aligned 3D+1D+4H\nPrice: <b>$${currentPrice.toFixed(4)}</b>\n\n✅ Full entry signal. Both assets agree.`);
       if(!activeTrade) lockTrade(allBull2?'bull':'bear');
     }
     lastBtcSignalState=btcSignal;
@@ -2128,6 +2192,145 @@ function exportExplorerCSV(){
 renderSavedResults();
 
 // ═══════════════════════════════════════════════════
+// TELEGRAM NOTIFICATION ENGINE
+// Token + ChatID stored in localStorage only.
+// Never in source code.
+// ═══════════════════════════════════════════════════
+const TG_TOKEN_KEY   = 'kdj_tg_token';
+const TG_CHAT_KEY    = 'kdj_tg_chat';
+const TG_PREFS_KEY   = 'kdj_tg_prefs';
+
+function getTgConfig(){
+  return {
+    token : localStorage.getItem(TG_TOKEN_KEY)||'',
+    chatId: localStorage.getItem(TG_CHAT_KEY)||'',
+  };
+}
+
+function getTgPrefs(){
+  try{ return JSON.parse(localStorage.getItem(TG_PREFS_KEY)||'{}'); }catch(e){ return {}; }
+}
+
+function saveTgSettings(){
+  const token  = document.getElementById('tgToken').value.trim();
+  const chatId = document.getElementById('tgChatId').value.trim();
+  if(!token||!chatId){ showTgStatus('Please enter both token and chat ID.','warn'); return; }
+  localStorage.setItem(TG_TOKEN_KEY, token);
+  localStorage.setItem(TG_CHAT_KEY, chatId);
+  // Clear the inputs so token isn't visible
+  document.getElementById('tgToken').value='';
+  document.getElementById('tgChatId').value='';
+  showTgStatus('✓ Saved securely to device storage.','ok');
+  updateTgStatusPanel();
+}
+
+function clearTgSettings(){
+  if(!confirm('Clear saved Telegram settings?')) return;
+  localStorage.removeItem(TG_TOKEN_KEY);
+  localStorage.removeItem(TG_CHAT_KEY);
+  document.getElementById('tgToken').value='';
+  document.getElementById('tgChatId').value='';
+  showTgStatus('Cleared.','warn');
+  updateTgStatusPanel();
+}
+
+function saveTgAlertPrefs(){
+  const prefs={
+    t1   : document.getElementById('tgAlertT1').checked,
+    t2   : document.getElementById('tgAlertT2').checked,
+    lock : document.getElementById('tgAlertLock').checked,
+    tp1  : document.getElementById('tgAlertTp1').checked,
+    tp2  : document.getElementById('tgAlertTp2').checked,
+    sl   : document.getElementById('tgAlertSl').checked,
+    exit : document.getElementById('tgAlertExit').checked,
+    arm  : document.getElementById('tgAlert3D').checked,
+  };
+  localStorage.setItem(TG_PREFS_KEY, JSON.stringify(prefs));
+  showTgStatus('✓ Alert preferences saved.','ok');
+}
+
+function loadTgAlertPrefs(){
+  const prefs=getTgPrefs();
+  const defaults={t1:true,t2:true,lock:true,tp1:true,tp2:true,sl:true,exit:true,arm:false};
+  const p={...defaults,...prefs};
+  document.getElementById('tgAlertT1').checked   = p.t1;
+  document.getElementById('tgAlertT2').checked   = p.t2;
+  document.getElementById('tgAlertLock').checked = p.lock;
+  document.getElementById('tgAlertTp1').checked  = p.tp1;
+  document.getElementById('tgAlertTp2').checked  = p.tp2;
+  document.getElementById('tgAlertSl').checked   = p.sl;
+  document.getElementById('tgAlertExit').checked = p.exit;
+  document.getElementById('tgAlert3D').checked   = p.arm;
+}
+
+function showTgStatus(msg, type){
+  const el=document.getElementById('tgStatus');
+  el.style.display='block';
+  el.style.background=type==='ok'?'rgba(0,232,122,.1)':type==='err'?'rgba(255,45,85,.1)':'rgba(245,166,35,.1)';
+  el.style.color=type==='ok'?'var(--bull2)':type==='err'?'var(--bear2)':'var(--amber)';
+  el.style.border=`1px solid ${type==='ok'?'rgba(0,232,122,.3)':type==='err'?'rgba(255,45,85,.3)':'rgba(245,166,35,.3)'}`;
+  el.textContent=msg;
+}
+
+function updateTgStatusPanel(){
+  const {token,chatId}=getTgConfig();
+  const panel=document.getElementById('tgStatusPanel');
+  if(!panel) return;
+  if(token&&chatId){
+    panel.style.color='var(--bull2)';
+    panel.textContent=`✓ Configured — Chat ID: ${chatId} · Token: ${'•'.repeat(8)}${token.slice(-4)}`;
+  } else {
+    panel.style.color='var(--text3)';
+    panel.textContent='Not configured. Add your bot token and chat ID above.';
+  }
+}
+
+// ── Core send function ──
+async function tgSend(message){
+  const {token,chatId}=getTgConfig();
+  if(!token||!chatId) return; // silently skip if not configured
+  try{
+    const url=`https://api.telegram.org/bot${token}/sendMessage`;
+    await fetch(url,{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({
+        chat_id: chatId,
+        text: message,
+        parse_mode: 'HTML',
+      })
+    });
+  }catch(e){ console.warn('Telegram send failed:',e); }
+}
+
+// ── Test message ──
+async function testTelegram(){
+  const token  = document.getElementById('tgToken').value.trim() || localStorage.getItem(TG_TOKEN_KEY)||'';
+  const chatId = document.getElementById('tgChatId').value.trim() || localStorage.getItem(TG_CHAT_KEY)||'';
+  if(!token||!chatId){ showTgStatus('Save your token and chat ID first.','warn'); return; }
+  showTgStatus('Sending test message...','warn');
+  try{
+    const url=`https://api.telegram.org/bot${token}/sendMessage`;
+    const r=await fetch(url,{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({chat_id:chatId, text:`🤖 <b>KDJ Scanner Connected</b>\n\nYour Telegram notifications are working.\n\n✅ Tier 1 &amp; Tier 2 signals\n✅ Trade locks with entry/TP/SL\n✅ TP1, TP2 &amp; SL hits\n✅ Exit warnings\n\n<i>You'll receive alerts here whenever the system detects a setup on XRP/USDT.</i>`, parse_mode:'HTML'})
+    });
+    const data=await r.json();
+    if(data.ok){ showTgStatus('✓ Test message sent! Check your Telegram.','ok'); }
+    else{ showTgStatus('Error: '+data.description,'err'); }
+  }catch(e){ showTgStatus('Failed: '+e.message,'err'); }
+}
+
+// ── Typed alert senders ──
+function tgAlert(type, msg){
+  const prefs=getTgPrefs();
+  const defaults={t1:true,t2:true,lock:true,tp1:true,tp2:true,sl:true,exit:true,arm:false};
+  const p={...defaults,...prefs};
+  if(p[type]) tgSend(msg);
+}
+
+// ═══════════════════════════════════════════════════
 // INIT
 // ═══════════════════════════════════════════════════
 createAllCards();
@@ -2138,6 +2341,9 @@ setInterval(()=>fetchAndRender(),30000);
 setInterval(updateClock,1000);
 updateClock();
 setTimeout(startWebSocket,2000);
+// Telegram init
+loadTgAlertPrefs();
+updateTgStatusPanel();
 </script>
 </body>
 </html>
