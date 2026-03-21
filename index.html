@@ -2013,7 +2013,7 @@ async function runExplorer(){
     el('exProgressFill').style.width='100%';
     el('exProgressText').textContent=`✓ Done — ${trades.length} trades found`;
 
-    renderExplorerResults(exAllTrades, lev, days, alignment, entryTrig, btcMode, tp1Pct, tp2Pct, slPct, maxHold);
+    renderExplorerResults(exAllTrades, lev, days, alignment, entryTrig, btcMode, tp1Pct, tp2Pct, slPct, maxHold, minJ, maxJ, minKDGap);
     el('exResults').style.display='block';
     el('exSaveBtn').style.display='inline-block';
 
@@ -2025,7 +2025,7 @@ async function runExplorer(){
   setTimeout(()=>el('exProgress').style.display='none',3000);
 }
 
-function renderExplorerResults(trades, lev, days, alignment, entryTrig, btcMode, tp1Pct, tp2Pct, slPct, maxHold){
+function renderExplorerResults(trades, lev, days, alignment, entryTrig, btcMode, tp1Pct, tp2Pct, slPct, maxHold, minJ=0, maxJ=100, minKDGap=0){
   const el=id=>document.getElementById(id);
   const wins=trades.filter(t=>t.outcome==='WIN');
   const partial=trades.filter(t=>t.outcome==='PARTIAL');
