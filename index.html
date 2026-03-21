@@ -319,9 +319,9 @@ body::before{content:'';position:fixed;inset:0;background:repeating-linear-gradi
       </select>
     </div>
     <div><label class="bt-label">TP1 %</label><input class="bt-input" type="number" id="btTp1" value="5" min="1" max="30" style="width:70px"/></div>
-    <div><label class="bt-label">TP2 %</label><input class="bt-input" type="number" id="btTp2" value="12" min="1" max="50" style="width:70px"/></div>
-    <div><label class="bt-label">SL %</label><input class="bt-input" type="number" id="btSl" value="3" min="0.5" max="20" style="width:70px"/></div>
-    <div><label class="bt-label">Max Hold (hrs)</label><input class="bt-input" type="number" id="btMaxHold" value="336" min="24" max="720" style="width:80px"/></div>
+    <div><label class="bt-label">TP2 % <span style="color:var(--text3);font-size:.6rem;">(live=15)</span></label><input class="bt-input" type="number" id="btTp2" value="15" min="1" max="50" style="width:70px"/></div>
+    <div><label class="bt-label">SL % <span style="color:var(--text3);font-size:.6rem;">(live=5)</span></label><input class="bt-input" type="number" id="btSl" value="5" min="0.5" max="20" style="width:70px"/></div>
+    <div><label class="bt-label">Max Hold (hrs) <span style="color:var(--text3);font-size:.6rem;">(live=168)</span></label><input class="bt-input" type="number" id="btMaxHold" value="168" min="24" max="720" style="width:80px"/></div>
     <div><label class="bt-label">BTC Filter</label>
       <select class="bt-select" id="btBtcFilter">
         <option value="on" selected>ON — XRP+BTC must agree</option>
@@ -477,17 +477,17 @@ body::before{content:'';position:fixed;inset:0;background:repeating-linear-gradi
 
         <div>
           <label class="bt-label">TP2 %</label>
-          <input class="bt-input" type="number" id="exTp2" value="12" min="1" max="50" style="width:100%;"/>
+          <input class="bt-input" type="number" id="exTp2" value="15" min="1" max="50" style="width:100%;"/>
         </div>
 
         <div>
           <label class="bt-label">Stop Loss %</label>
-          <input class="bt-input" type="number" id="exSl" value="3" min="0.5" max="20" style="width:100%;"/>
+          <input class="bt-input" type="number" id="exSl" value="5" min="0.5" max="20" style="width:100%;"/>
         </div>
 
         <div>
           <label class="bt-label">Max Hold (hours)</label>
-          <input class="bt-input" type="number" id="exMaxHold" value="336" min="24" max="720" style="width:100%;"/>
+          <input class="bt-input" type="number" id="exMaxHold" value="168" min="24" max="720" style="width:100%;"/>
         </div>
 
         <div>
@@ -503,7 +503,7 @@ body::before{content:'';position:fixed;inset:0;background:repeating-linear-gradi
         <div>
           <label class="bt-label">Max J at Entry (avoid overextended)</label>
           <div style="display:flex;gap:8px;align-items:center;">
-            <input class="bt-input" type="number" id="exMaxJ" value="100" min="50" max="100" style="width:70px;" title="Skip entry if 1D J already above this. 100 = no filter."/>
+            <input class="bt-input" type="number" id="exMaxJ" value="100" min="50" max="100" style="width:70px;" title="Skip entry if 1D J already above this. 100 = no filter (accepts all)."/>
             <span style="font-size:.65rem;color:var(--text3);">100 = no filter</span>
           </div>
         </div>
@@ -1004,12 +1004,17 @@ document.addEventListener('click',()=>{try{getAudioCtx();}catch(e){}},{once:true
 function lockTrade(dir){
   if(activeTrade) return;
   const ep=currentPrice, isLong=dir==='bull';
-  activeTrade={dir,entry:ep,tp1:isLong?ep*1.05:ep*0.95,tp2:isLong?ep*1.12:ep*0.88,sl:isLong?ep*0.97:ep*1.03,tp1Hit:false,lockedAt:Date.now()};
+  activeTrade={dir,entry:ep,
+    tp1    : isLong ? ep*1.05  : ep*0.95,   // TP1 = 5%
+    tp2    : isLong ? ep*1.15  : ep*0.85,   // TP2 = 15%
+    sl     : isLong ? ep*0.95  : ep*1.05,   // SL  = 5%
+    tp1Hit:false,lockedAt:Date.now()
+  };
   renderTrade();
   addAlert(`🔒 Trade locked — ${isLong?'LONG':'SHORT'} entry $${ep.toFixed(4)} | TP1 $${activeTrade.tp1.toFixed(4)} | TP2 $${activeTrade.tp2.toFixed(4)} | SL $${activeTrade.sl.toFixed(4)}`,isLong?'bull':'bear','LOCK');
   // Record to history
   histOnLock(activeTrade.dir, activeTrade.entry, activeTrade.tp1, activeTrade.tp2, activeTrade.sl);
-  tgAlert('lock',`🔒 <b>TRADE LOCKED — ${isLong?'LONG ▲':'SHORT ▼'}</b>\n\n📍 Entry: <b>$${ep.toFixed(4)}</b>\n✅ TP1: $${activeTrade.tp1.toFixed(4)} (+5%)\n🏆 TP2: $${activeTrade.tp2.toFixed(4)} (+12%)\n🛑 SL:  $${activeTrade.sl.toFixed(4)} (-3%)\n\nR:R = 4:1`);
+  tgAlert('lock',`🔒 <b>TRADE LOCKED — ${isLong?'LONG ▲':'SHORT ▼'}</b>\n\n📍 Entry: <b>$${ep.toFixed(4)}</b>\n✅ TP1: $${activeTrade.tp1.toFixed(4)} (+5%)\n🏆 TP2: $${activeTrade.tp2.toFixed(4)} (+15%)\n🛑 SL:  $${activeTrade.sl.toFixed(4)} (-5%)\n\nR:R = 3:1`);
 }
 
 function resetTrade(){
@@ -1044,8 +1049,8 @@ function renderTrade(){
   document.getElementById('tp1Tag').textContent=t.tp1Hit?'✓ HIT':(isLong?'+5%':'-5%');
   document.getElementById('tp1Tag').style.background=t.tp1Hit?'var(--bull2)':'var(--bull-bg)';
   document.getElementById('tp1Tag').style.color=t.tp1Hit?'#000':'var(--bull2)';
-  document.getElementById('tp2Tag').textContent=isLong?'+12%':'-12%';
-  document.getElementById('slTag').textContent=isLong?'-3%':'+3%';
+  document.getElementById('tp2Tag').textContent=isLong?'+15%':'-15%';
+  document.getElementById('slTag').textContent=isLong?'-5%':'+5%';
 
   const risk=Math.abs(t.entry-t.sl), reward=Math.abs(t.tp2-t.entry);
   document.getElementById('rrVal').textContent=(reward/risk).toFixed(2)+':1';
@@ -1888,9 +1893,11 @@ async function runExplorer(){
     await new Promise(r=>setTimeout(r,0));
 
     const trades=[];
-    const len=Math.min(c1h.length, btcC1h.length);
+    // Only clamp to BTC length if BTC filter is on AND BTC data loaded successfully
+    const len=(btcMode!=='off'&&btcC1h&&btcC1h.length>0)?Math.min(c1h.length,btcC1h.length):c1h.length;
     let inTrade=false,entry=0,tradeDir='',openBar=0,entryDate='';
     let last3dIdx=-1,last3dDir=null,armed=false,tradeUsed=false;
+    let pendingEntry1dJ=50,pendingEntry1dGap=0,pendingEntry4hDir='?';
 
     for(let hi=200;hi<len;hi++){
       const tMs=c1h[hi].t;
@@ -1959,10 +1966,8 @@ async function runExplorer(){
           // Capture state at EXIT for analysis
           const ex1d={k:kdj1d[i1d].k,d:kdj1d[i1d].d,j:kdj1d[i1d].j,gap:Math.abs(kdj1d[i1d].k-kdj1d[i1d].d)};
           trades.push({date,entryDate,dir:tradeDir,entry,exit:exitP,bars:hi-openBar,raw,pnl,outcome,
-            // Entry context
-            entry1dJ:trades._entry1dJ||50, entry1dGap:trades._entry1dGap||0,
-            entry4hDir:trades._entry4hDir||'?', entryBtcDir:bs3d.dir,
-            // Exit context
+            entry1dJ:pendingEntry1dJ, entry1dGap:pendingEntry1dGap,
+            entry4hDir:pendingEntry4hDir, entryBtcDir:bs3d.dir,
             exit1dJ:ex1d.j, exit1dGap:ex1d.gap,
             exit1dDir:s1d.dir, exitBtcDir:bs3d.dir,
           });
@@ -1998,9 +2003,8 @@ async function runExplorer(){
           entry=c1h[hi].c; tradeDir=domDir; inTrade=true; openBar=hi;
           entryDate=new Date(c1h[hi].t).toLocaleDateString('en-GB',{day:'2-digit',month:'short',year:'2-digit'});
           tradeUsed=true;
-          // Store entry context on trades array temporarily
-          trades._entry1dJ=s1d.j; trades._entry1dGap=s1d.gap;
-          trades._entry4hDir=s4h.dir; trades._entryBtcDir=bs3d.dir;
+          // Store entry context in pending vars — attached to trade on close
+          pendingEntry1dJ=s1d.j; pendingEntry1dGap=s1d.gap; pendingEntry4hDir=s4h.dir;
         }
       }
     }
@@ -2009,7 +2013,7 @@ async function runExplorer(){
     el('exProgressFill').style.width='100%';
     el('exProgressText').textContent=`✓ Done — ${trades.length} trades found`;
 
-    renderExplorerResults(trades, lev, days, alignment, entryTrig, btcMode, tp1Pct, tp2Pct, slPct, maxHold);
+    renderExplorerResults(exAllTrades, lev, days, alignment, entryTrig, btcMode, tp1Pct, tp2Pct, slPct, maxHold);
     el('exResults').style.display='block';
     el('exSaveBtn').style.display='inline-block';
 
