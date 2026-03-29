@@ -57,6 +57,7 @@ body::before{content:'';position:fixed;inset:0;background:repeating-linear-gradi
 .align-banner.ready{background:var(--bull-bg);border-color:rgba(0,232,122,.25);}
 .align-banner.wait{background:var(--amber-bg);border-color:rgba(245,166,35,.2);}
 .align-banner.bear{background:var(--bear-bg);border-color:rgba(255,45,85,.2);}
+.align-banner.blue{background:rgba(74,158,255,.05);border-color:rgba(74,158,255,.2);}
 .align-icon{font-size:1.6rem;}
 .align-title{font-family:var(--sans);font-size:1rem;font-weight:700;}
 .align-sub{font-size:.72rem;color:var(--text2);margin-top:2px;}
@@ -64,6 +65,7 @@ body::before{content:'';position:fixed;inset:0;background:repeating-linear-gradi
 .align-banner.ready .align-badge{background:var(--bull2);color:#000;}
 .align-banner.wait .align-badge{background:var(--amber);color:#000;}
 .align-banner.bear .align-badge{background:var(--bear2);color:#fff;}
+.align-banner.blue .align-badge{background:var(--blue2);color:#000;}
 .tf-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:10px;margin-bottom:14px;}
 @media(max-width:900px){.tf-grid{grid-template-columns:repeat(3,1fr);}}
 @media(max-width:580px){.tf-grid{grid-template-columns:repeat(2,1fr);}}
@@ -214,27 +216,57 @@ body::before{content:'';position:fixed;inset:0;background:repeating-linear-gradi
 <!-- MONITOR TAB -->
 <div class="content active" id="tab-monitor">
 
+  <!-- ALIGNMENT BANNER -->
   <div class="align-banner wait" id="alignBanner">
     <div class="align-icon" id="alignIcon">⏳</div>
-    <div>
+    <div style="flex:1;">
       <div class="align-title" id="alignTitle">SCANNING — NO SIGNAL YET</div>
       <div class="align-sub" id="alignSub">3D, 1D and 4H must align on both XRP &amp; BTC</div>
     </div>
     <div class="align-badge" id="alignBadge">SCANNING</div>
   </div>
 
+  <!-- XRP TF CARDS -->
   <div style="font-size:.62rem;color:var(--text3);text-transform:uppercase;letter-spacing:1px;margin-bottom:8px;">XRP/USDT — KDJ Timeframes</div>
   <div class="tf-grid" id="tfGrid"></div>
 
+  <!-- BTC CONFIRMATION: TF cards + 3D detail panel -->
   <div style="margin-bottom:14px;">
     <div style="font-size:.62rem;color:var(--text3);text-transform:uppercase;letter-spacing:1px;margin-bottom:8px;display:flex;align-items:center;gap:8px;">
       <span>BTC/USDT — KDJ Confirmation</span>
       <span style="flex:1;height:1px;background:var(--border);display:block;"></span>
       <span id="btcConfirmBadge" style="padding:2px 10px;border-radius:3px;font-weight:700;font-size:.65rem;background:var(--bg3);color:var(--text3);">LOADING...</span>
     </div>
-    <div class="tf-grid" id="btcTfGrid" style="grid-template-columns:repeat(3,1fr);"></div>
+    <div style="display:grid;grid-template-columns:1fr auto;gap:10px;align-items:start;">
+      <div class="tf-grid" id="btcTfGrid" style="grid-template-columns:repeat(3,1fr);margin-bottom:0;"></div>
+      <div class="panel" id="btcDetailPanel" style="padding:12px 14px;min-width:200px;">
+        <div style="font-size:.62rem;color:var(--text3);margin-bottom:8px;text-transform:uppercase;letter-spacing:1px;">BTC 3-Day KDJ</div>
+        <div style="color:var(--text3);font-size:.72rem;">Loading...</div>
+      </div>
+    </div>
   </div>
 
+  <!-- SIGNAL STAGES + CLOSED TRADES -->
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px;">
+    <div class="panel" style="padding:12px 14px;">
+      <div class="panel-title">Signal Stages</div>
+      <div style="display:flex;flex-direction:column;gap:5px;font-size:.7rem;line-height:1.6;">
+        <div><span style="color:var(--bull2);font-weight:700;">🚀 FULL</span> — XRP 3D+1D+4H aligned + 1H cross. Strongest signal.</div>
+        <div><span style="color:#f0a500;font-weight:700;">⚡ EARLY</span> — 1D+4H aligned, 3D still forming. Enter early, 3D confirms after.</div>
+        <div><span style="color:var(--blue2);font-weight:700;">₿ BTC-LED</span> — BTC 3D crossed first, XRP 1D+4H followed. BTC leads XRP.</div>
+        <div><span style="color:var(--amber);font-weight:700;">⏳ WATCHING</span> — Higher TFs aligned, waiting for 1H cross to trigger.</div>
+        <div><span style="color:var(--bear2);font-weight:700;">⚠️ COUNTER</span> — Lower TFs opposite to 3D. Do NOT trade.</div>
+      </div>
+    </div>
+    <div class="panel">
+      <div class="panel-title">Closed Trades <span id="closedTradeCount" style="color:var(--text3);font-weight:400;font-size:.65rem;text-transform:none;letter-spacing:0;"></span></div>
+      <div id="closedTradesList" style="max-height:180px;overflow-y:auto;">
+        <div style="color:var(--text3);font-size:.75rem;text-align:center;padding:16px;">No closed trades yet.</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- LOWER ROW: Active Trade (with manual close) + Conditions + Alerts -->
   <div class="lower-row">
 
     <div class="panel" id="entryPanel">
@@ -258,12 +290,12 @@ body::before{content:'';position:fixed;inset:0;background:repeating-linear-gradi
         <div class="entry-level tp2-row">
           <span class="entry-level-label">TP2</span>
           <span class="entry-level-val" id="tp2Val" style="color:var(--bull2)">—</span>
-          <span class="entry-level-tag" id="tp2Tag" style="background:var(--bull-bg);color:var(--bull2)">+12%</span>
+          <span class="entry-level-tag" id="tp2Tag" style="background:var(--bull-bg);color:var(--bull2)">+15%</span>
         </div>
         <div class="entry-level sl-row">
           <span class="entry-level-label">STOP LOSS</span>
           <span class="entry-level-val" id="slVal" style="color:var(--bear2)">—</span>
-          <span class="entry-level-tag" id="slTag" style="background:var(--bear-bg);color:var(--bear2)">-3%</span>
+          <span class="entry-level-tag" id="slTag" style="background:var(--bear-bg);color:var(--bear2)">-5%</span>
         </div>
         <div style="display:flex;justify-content:space-between;align-items:center;padding:6px 10px;background:var(--bg3);border-radius:5px;margin-top:6px;">
           <span style="font-size:.65rem;color:var(--text2);">Current</span>
@@ -275,7 +307,13 @@ body::before{content:'';position:fixed;inset:0;background:repeating-linear-gradi
           <span class="rr-label">Risk / Reward</span>
           <span class="rr-val" id="rrVal">—</span>
         </div>
-        <button onclick="resetTrade()" style="width:100%;margin-top:10px;padding:6px;background:var(--bg3);border:1px solid var(--border2);color:var(--text3);border-radius:5px;font-family:var(--mono);font-size:.68rem;cursor:pointer;">✕ CLEAR &amp; WAIT FOR NEXT SIGNAL</button>
+        <!-- MANUAL CLOSE BUTTONS -->
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:5px;margin-top:10px;">
+          <button onclick="manualCloseTrade('TP1')" style="padding:6px;background:rgba(0,232,122,.1);color:var(--bull2);border:1px solid rgba(0,232,122,.3);border-radius:5px;cursor:pointer;font-family:var(--mono);font-size:.68rem;font-weight:700;">✅ TP1 Hit</button>
+          <button onclick="manualCloseTrade('TP2')" style="padding:6px;background:rgba(0,232,122,.15);color:var(--bull2);border:1px solid rgba(0,232,122,.4);border-radius:5px;cursor:pointer;font-family:var(--mono);font-size:.68rem;font-weight:700;">🎯 TP2 Hit</button>
+          <button onclick="manualCloseTrade('SL')"  style="padding:6px;background:rgba(255,45,85,.1);color:var(--bear2);border:1px solid rgba(255,45,85,.3);border-radius:5px;cursor:pointer;font-family:var(--mono);font-size:.68rem;font-weight:700;">❌ SL Hit</button>
+          <button onclick="resetTrade()" style="padding:6px;background:var(--bg3);border:1px solid var(--border2);color:var(--text3);border-radius:5px;font-family:var(--mono);font-size:.68rem;cursor:pointer;">✕ Manual</button>
+        </div>
       </div>
     </div>
 
@@ -748,37 +786,13 @@ function renderAlignment(){
       <span style="font-size:.68rem;font-weight:600;color:${c.ok?'var(--bull2)':'var(--text3)'}">${c.val}</span>
     </div>`).join('');
 
-  const banner=document.getElementById('alignBanner');
-  const icon=document.getElementById('alignIcon');
-  const title=document.getElementById('alignTitle');
-  const sub=document.getElementById('alignSub');
-  const badge=document.getElementById('alignBadge');
-  if(btcAgreesLong){
-    banner.className='align-banner ready';icon.textContent='🚀';
-    title.textContent='TIER 2 — XRP + BTC BOTH BULLISH';
-    sub.textContent='Highest conviction LONG. Both 3D·1D·4H aligned UP. Watch 1H for entry.';
-    badge.textContent='ENTER LONG';
-  }else if(btcAgreesShort){
-    banner.className='align-banner bear';icon.textContent='🚀';
-    title.textContent='TIER 2 — XRP + BTC BOTH BEARISH';
-    sub.textContent='Highest conviction SHORT. Both 3D·1D·4H aligned DOWN. Watch 1H for entry.';
-    badge.textContent='ENTER SHORT';
-  }else if(allBull){
-    banner.className='align-banner wait';icon.textContent='⚡';
-    title.textContent='TIER 1 — XRP BULLISH · WAITING FOR BTC';
-    sub.textContent='XRP 3D·1D·4H aligned UP. BTC not yet confirmed.';
-    badge.textContent='WAIT BTC';
-  }else if(allBear){
-    banner.className='align-banner wait';icon.textContent='⚡';
-    title.textContent='TIER 1 — XRP BEARISH · WAITING FOR BTC';
-    sub.textContent='XRP 3D·1D·4H aligned DOWN. BTC not yet confirmed.';
-    badge.textContent='WAIT BTC';
-  }else{
-    banner.className='align-banner wait';icon.textContent='⏳';
-    title.textContent='SCANNING — NO SIGNAL YET';
-    sub.textContent='XRP higher TFs not aligned: '+['3D','1D','4H'].map((k,i)=>k+':'+(dirs[i]||'?').slice(0,1).toUpperCase()).join(' ');
-    badge.textContent='SCANNING';
-  }
+  // Use rich stage system for banner
+  const stage=computeSignalStage();
+  applyBanner(stage);
+
+  // Update BTC 3D detail panel
+  const btcKDJ3d=btcTfData['3D']?.latest;
+  if(btcKDJ3d) updateBtcDetailPanel(btcTfData['3D']?.dir, btcKDJ3d);
 }
 
 // ═══════════════════════════════════════════════════
@@ -1806,9 +1820,149 @@ async function testTelegram(){
 function tgAlert(type,msg){const prefs=getTgPrefs(),defaults={t1:true,t2:true,lock:true,tp1:true,tp2:true,sl:true,exit:true,arm:false},p={...defaults,...prefs};if(p[type]) tgSend(msg);}
 
 // ═══════════════════════════════════════════════════
+// BTC 3D DETAIL PANEL
+// ═══════════════════════════════════════════════════
+function updateBtcDetailPanel(btcDir, btcKDJ){
+  const el=document.getElementById('btcDetailPanel');
+  if(!el||!btcKDJ) return;
+  const col=btcDir==='bull'?'var(--bull2)':'var(--bear2)';
+  el.innerHTML=`
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+      <span style="font-size:.62rem;color:var(--text3);text-transform:uppercase;letter-spacing:1px;">BTC 3-Day KDJ</span>
+      <span style="color:${col};font-weight:700;font-size:.75rem;">${(btcDir||'—').toUpperCase()}</span>
+    </div>
+    ${[['K',btcKDJ.k,'var(--amber)'],['D',btcKDJ.d,'var(--blue)'],['J',btcKDJ.j,'var(--bull2)']].map(([n,v,c])=>`
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:5px;">
+      <span style="font-size:.65rem;color:${c};width:12px;">${n}</span>
+      <div style="flex:1;height:3px;background:var(--bg3);border-radius:2px;">
+        <div style="width:${Math.max(0,Math.min(100,v))}%;height:100%;background:${c};border-radius:2px;"></div>
+      </div>
+      <span style="font-size:.72rem;font-weight:600;width:32px;text-align:right;color:${v>80?'var(--bull2)':v<20?'var(--bear2)':'var(--text)'};">${v.toFixed(1)}</span>
+    </div>`).join('')}
+    <div style="margin-top:8px;padding:5px 8px;border-radius:4px;background:${btcDir==='bull'?'var(--bull-bg)':'var(--bear-bg)'};font-size:.65rem;color:${col};font-weight:600;">
+      ${btcDir==='bull'?'BTC bullish — XRP likely to follow':'BTC bearish — XRP likely to follow'}
+    </div>`;
+}
+
+// ═══════════════════════════════════════════════════
+// SIGNAL STAGE BANNER — rich FULL/EARLY/BTC-LED logic
+// ═══════════════════════════════════════════════════
+function computeSignalStage(){
+  const d3=tfData['3D']?.dir, d1=tfData['1D']?.dir, d4=tfData['4H']?.dir;
+  const btcD3=btcTfData['3D']?.dir, btcD1=btcTfData['1D']?.dir, btcD4=btcTfData['4H']?.dir;
+  const x1h=tfData['1H']?.cross;
+  const same=(...a)=>a.length&&a.every(d=>d&&d===a[0]);
+  const btcAligned=same(btcD3,btcD1,btcD4);
+
+  if(same(d3,d1,d4)){
+    const dir=d3;
+    const ready=(dir==='bull'&&x1h==='golden')||(dir==='bear'&&x1h==='death');
+    if(ready) return{stage:'FULL',dir,cls:'ready',icon:'🚀',badge:'ENTER NOW',
+      title:'FULL SIGNAL — ALL TIMEFRAMES ALIGNED',
+      details:['✅ XRP 3D aligned','✅ XRP 1D aligned','✅ XRP 4H aligned','✅ 1H cross fired — ENTER NOW',btcAligned&&btcD3===dir?'✅ BTC confirms direction':'⚡ BTC: '+btcD3]};
+    return{stage:'WATCHING_1H',dir,cls:'wait',icon:'⏳',badge:'WAIT 1H CROSS',
+      title:'SETUP READY — WAITING FOR 1H ENTRY CROSS',
+      details:['✅ XRP 3D aligned','✅ XRP 1D aligned','✅ XRP 4H aligned','⏳ Waiting for 1H cross to enter...']};
+  }
+  if(same(d1,d4)&&d3!==d1){
+    const dir=d1;
+    const ready=(dir==='bull'&&x1h==='golden')||(dir==='bear'&&x1h==='death');
+    if(ready) return{stage:'EARLY',dir,cls:'ready',icon:'⚡',badge:'EARLY ENTRY',
+      title:'EARLY ENTRY — 1D+4H ALIGNED, 3D FORMING',
+      details:['⏳ XRP 3D still forming (lagging)','✅ XRP 1D aligned','✅ XRP 4H aligned','✅ 1H cross — EARLY ENTRY (3D confirms after)']};
+    return{stage:'EARLY_WATCH',dir,cls:'wait',icon:'⏳',badge:'EARLY SETUP',
+      title:'EARLY SETUP — 1D+4H ALIGNED, WATCH 1H',
+      details:['⏳ XRP 3D still forming','✅ XRP 1D aligned','✅ XRP 4H aligned','⏳ Waiting for 1H cross — early setup']};
+  }
+  if(btcD3&&same(btcD3,d1,d4)&&d3!==btcD3){
+    const dir=btcD3;
+    const ready=(dir==='bull'&&x1h==='golden')||(dir==='bear'&&x1h==='death');
+    if(ready) return{stage:'BTC_LED',dir,cls:'blue',icon:'₿',badge:'BTC-LED ENTRY',
+      title:'BTC-LED SIGNAL — XRP WILL FOLLOW BTC',
+      details:['✅ BTC 3D crossed '+(dir==='bull'?'BULLISH':'BEARISH'),'⏳ XRP 3D lagging BTC','✅ XRP 1D aligned','✅ XRP 4H aligned','✅ 1H cross — BTC-LED ENTRY']};
+    return{stage:'BTC_WATCH',dir,cls:'blue',icon:'₿',badge:'BTC WATCH',
+      title:'BTC LED — WATCHING XRP 1H CROSS',
+      details:['✅ BTC 3D crossed','⏳ XRP 3D lagging','✅ XRP 1D aligned','✅ XRP 4H aligned','⏳ Waiting for 1H cross']};
+  }
+  if(d3&&tfData['1H']?.dir&&tfData['1H'].dir!==d3){
+    return{stage:'COUNTER',dir:tfData['1H'].dir,cls:'bear',icon:'⚠️',badge:'COUNTER-TREND',
+      title:'COUNTER-TREND — LOWER TFs AGAINST 3D',
+      details:['⚠️ 3D: '+d3.toUpperCase(),'⚠️ 1H: '+tfData['1H'].dir.toUpperCase()+' (OPPOSITE)','❌ Counter-trend — do not trade','⏳ Wait for 3D alignment before entering']};
+  }
+  // Fallback to Tier system
+  const allBull=['3D','1D','4H'].every(k=>tfData[k]?.dir==='bull');
+  const allBear=['3D','1D','4H'].every(k=>tfData[k]?.dir==='bear');
+  const btcBull=['3D','1D','4H'].every(k=>btcTfData[k]?.dir==='bull');
+  const btcBear=['3D','1D','4H'].every(k=>btcTfData[k]?.dir==='bear');
+  if(allBull&&btcBull) return{stage:'TIER2_BULL',dir:'bull',cls:'ready',icon:'🚀',badge:'ENTER LONG',title:'TIER 2 — XRP + BTC BOTH BULLISH',details:['✅ Highest conviction LONG','✅ Both 3D·1D·4H aligned UP','✅ BTC agrees','⏳ Watch 1H for entry cross']};
+  if(allBear&&btcBear) return{stage:'TIER2_BEAR',dir:'bear',cls:'bear',icon:'🚀',badge:'ENTER SHORT',title:'TIER 2 — XRP + BTC BOTH BEARISH',details:['✅ Highest conviction SHORT','✅ Both 3D·1D·4H aligned DOWN','✅ BTC agrees','⏳ Watch 1H for entry cross']};
+  if(allBull) return{stage:'TIER1_BULL',dir:'bull',cls:'wait',icon:'⚡',badge:'WAIT BTC',title:'TIER 1 — XRP BULLISH · WAITING FOR BTC',details:['✅ XRP 3D·1D·4H aligned UP','⏳ BTC not yet confirmed']};
+  if(allBear) return{stage:'TIER1_BEAR',dir:'bear',cls:'wait',icon:'⚡',badge:'WAIT BTC',title:'TIER 1 — XRP BEARISH · WAITING FOR BTC',details:['✅ XRP 3D·1D·4H aligned DOWN','⏳ BTC not yet confirmed']};
+  return{stage:'NONE',dir:null,cls:'wait',icon:'⏳',badge:'SCANNING',title:'SCANNING — NO SIGNAL YET',
+    details:['○ XRP 3D: '+(d3||'neutral'),'○ XRP 1D: '+(d1||'neutral'),'○ XRP 4H: '+(d4||'neutral'),'○ BTC 3D: '+(btcD3||'neutral'),'⏳ No signal — waiting for alignment']};
+}
+
+function applyBanner(s){
+  document.getElementById('alignBanner').className='align-banner '+s.cls;
+  document.getElementById('alignIcon').textContent=s.icon;
+  document.getElementById('alignTitle').textContent=s.title;
+  document.getElementById('alignBadge').textContent=s.badge;
+  document.getElementById('alignSub').innerHTML=s.details.map(d=>`<span style="display:block;margin-top:2px;">${d}</span>`).join('');
+}
+
+// ═══════════════════════════════════════════════════
+// CLOSED TRADES (session + localStorage)
+// ═══════════════════════════════════════════════════
+const CLOSED_TRADES_KEY='kdj_closed_trades_v1';
+function loadClosedTrades(){ try{return JSON.parse(localStorage.getItem(CLOSED_TRADES_KEY)||'[]');}catch(e){return[];} }
+function saveClosedTrades(arr){ try{localStorage.setItem(CLOSED_TRADES_KEY,JSON.stringify(arr));}catch(e){} }
+
+function manualCloseTrade(reason){
+  if(!activeTrade) return;
+  const t=activeTrade, isLong=t.dir==='bull';
+  const exitPrice=reason==='TP1'?t.tp1:reason==='TP2'?t.tp2:reason==='SL'?t.sl:currentPrice;
+  const rawPnl=isLong?(exitPrice-t.entry)/t.entry*100:(t.entry-exitPrice)/t.entry*100;
+  const hoursOpen=Math.round((Date.now()-t.lockedAt)/3600000);
+  const closed={dir:t.dir,entry:t.entry,exitPrice,reason,rawPnl:+rawPnl.toFixed(2),hoursOpen,closedAt:Date.now()};
+  const arr=loadClosedTrades();arr.unshift(closed);if(arr.length>100)arr.length=100;saveClosedTrades(arr);
+  addAlert(`${reason==='TP1'?'✅ TP1':reason==='TP2'?'🎯 TP2':reason==='SL'?'❌ SL':'✕ Manual'} — closed ${isLong?'LONG':'SHORT'} @ $${parseFloat(exitPrice).toFixed(4)} (${rawPnl>=0?'+':''}${rawPnl.toFixed(2)}% raw)`,rawPnl>=0?'bull':'bear','CLOSE');
+  playBeep(reason==='SL'?'arm':'signal');
+  histOnClose(t.dir,t.entry,parseFloat(exitPrice),reason==='TP2'?'WIN':reason==='TP1'?'PARTIAL':reason==='SL'?'LOSS':'manual',hoursOpen);
+  tgAlert(reason==='TP1'?'tp1':reason==='TP2'?'tp2':reason==='SL'?'sl':'exit',`${reason==='TP1'?'✅ TP1 Hit':'🎯 TP2 Hit' } — ${isLong?'LONG':'SHORT'} closed @ $${parseFloat(exitPrice).toFixed(4)}\nP&amp;L: ${rawPnl>=0?'+':''}${rawPnl.toFixed(2)}% raw`);
+  activeTrade=null; saveActiveTrade();
+  document.getElementById('tradeNoSignal').style.display='block';
+  document.getElementById('tradeActive').style.display='none';
+  document.getElementById('tradePanelTitle').textContent='Waiting for Signal';
+  renderClosedTrades();
+}
+
+function renderClosedTrades(){
+  const el=document.getElementById('closedTradesList');
+  if(!el) return;
+  const arr=loadClosedTrades();
+  document.getElementById('closedTradeCount').textContent=arr.length?`— ${arr.length} trades`:'';
+  if(!arr.length){el.innerHTML='<div style="color:var(--text3);font-size:.75rem;text-align:center;padding:16px;">No closed trades yet.</div>';return;}
+  el.innerHTML=arr.map(t=>{
+    const pc=t.rawPnl>=0?'var(--bull2)':'var(--bear2)';
+    const dc=t.dir==='bull'?'var(--bull2)':'var(--bear2)';
+    const dt=new Date(t.closedAt).toLocaleDateString('en-GB',{day:'2-digit',month:'short',year:'2-digit'});
+    const tm=new Date(t.closedAt).toLocaleTimeString('en-US',{hour12:false,hour:'2-digit',minute:'2-digit'});
+    return`<div style="background:var(--bg2);border:1px solid var(--border);border-left:2px solid ${pc};border-radius:5px;padding:7px 10px;margin-bottom:5px;font-size:.7rem;">
+      <div style="display:flex;justify-content:space-between;margin-bottom:3px;">
+        <span style="color:${dc};font-weight:700;">${t.dir==='bull'?'▲ LONG':'▼ SHORT'} — ${t.reason}</span>
+        <span style="color:${pc};font-weight:700;">${t.rawPnl>=0?'+':''}${t.rawPnl}% raw</span>
+      </div>
+      <div style="color:var(--text3);">Entry: $${parseFloat(t.entry).toFixed(4)} → Exit: $${parseFloat(t.exitPrice).toFixed(4)}</div>
+      <div style="color:var(--text3);">${dt} ${tm} · ${t.hoursOpen}h open</div>
+    </div>`;
+  }).join('');
+}
+
+// ═══════════════════════════════════════════════════
 // INIT
 // ═══════════════════════════════════════════════════
 createAllCards();
+renderClosedTrades(); // restore closed trades from localStorage
 
 // ── FIX 2: Restore active trade from localStorage before first render ──
 if(loadActiveTrade()){
