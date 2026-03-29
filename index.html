@@ -744,7 +744,28 @@ function resetTrade(){
 }
 
 function renderTrade(){
-  if(!activeTrade){resetTrade();return;}
+  // SAFETY: never run TP/SL checks if price hasn't loaded yet
+  if(!activeTrade) return;
+  if(currentPrice <= 0) {
+    // Price not loaded yet — just show the panel, skip all checks
+    const t=activeTrade, isLong=t.dir==='bull';
+    document.getElementById('tradeNoSignal').style.display='none';
+    document.getElementById('tradeActive').style.display='block';
+    document.getElementById('tradePanelTitle').textContent=isLong?'▲ LONG ACTIVE':'▼ SHORT ACTIVE';
+    const badge=document.getElementById('tradeDirBadge');
+    badge.textContent=isLong?'▲ LONG':'▼ SHORT';
+    badge.style.background=isLong?'var(--bull-bg)':'var(--bear-bg)';
+    badge.style.color=isLong?'var(--bull2)':'var(--bear2)';
+    badge.style.border=`1px solid ${isLong?'rgba(0,232,122,.3)':'rgba(255,45,85,.3)'}`;
+    document.getElementById('entryPrice').textContent='$'+t.entry.toFixed(4);
+    document.getElementById('tp1Val').textContent='$'+t.tp1.toFixed(4);
+    document.getElementById('tp2Val').textContent='$'+t.tp2.toFixed(4);
+    document.getElementById('slVal').textContent='$'+t.sl.toFixed(4);
+    document.getElementById('tradeCurPrice').textContent='Fetching...';
+    document.getElementById('tradePnlPct').textContent='—';
+    document.getElementById('tradeVerdict').innerHTML='<b style="color:var(--amber)">⏳ Loading live price...</b>';
+    return;
+  }
   const t=activeTrade,isLong=t.dir==='bull',price=currentPrice;
   document.getElementById('tradeNoSignal').style.display='none';
   document.getElementById('tradeActive').style.display='block';
@@ -1391,10 +1412,27 @@ createAllCards();
 addAlert('Connecting to Binance — fetching XRP + BTC data...','info','');
 
 // Restore active trade on page refresh
+// currentPrice is still 0 here — renderTrade() safely handles this
 activeTrade=loadActive();
 if(activeTrade){
-  addAlert(`Restored trade: ${activeTrade.dir==='bull'?'LONG':'SHORT'} @ $${activeTrade.entry?.toFixed(4)} from ${new Date(activeTrade.lockedAt).toLocaleString()}`,'info','RESTORE');
-  renderTrade();
+  // Show the panel immediately with entry data — price loads shortly after
+  document.getElementById('tradeNoSignal').style.display='none';
+  document.getElementById('tradeActive').style.display='block';
+  const isLong=activeTrade.dir==='bull';
+  document.getElementById('tradePanelTitle').textContent=isLong?'▲ LONG ACTIVE':'▼ SHORT ACTIVE';
+  const badge=document.getElementById('tradeDirBadge');
+  badge.textContent=isLong?'▲ LONG':'▼ SHORT';
+  badge.style.background=isLong?'var(--bull-bg)':'var(--bear-bg)';
+  badge.style.color=isLong?'var(--bull2)':'var(--bear2)';
+  badge.style.border=`1px solid ${isLong?'rgba(0,232,122,.3)':'rgba(255,45,85,.3)'}`;
+  document.getElementById('entryPrice').textContent='$'+activeTrade.entry?.toFixed(4);
+  document.getElementById('tp1Val').textContent='$'+activeTrade.tp1?.toFixed(4);
+  document.getElementById('tp2Val').textContent='$'+activeTrade.tp2?.toFixed(4);
+  document.getElementById('slVal').textContent='$'+activeTrade.sl?.toFixed(4);
+  document.getElementById('tradeCurPrice').textContent='Loading...';
+  document.getElementById('tradePnlPct').textContent='—';
+  document.getElementById('tradeVerdict').innerHTML='<b style="color:var(--amber)">⏳ Fetching live price to resume monitoring...</b>';
+  addAlert(`Restored: ${isLong?'LONG':'SHORT'} @ $${activeTrade.entry?.toFixed(4)} — opened ${new Date(activeTrade.lockedAt).toLocaleString()}`,'info','RESTORE');
 }
 
 updateHistStats();
