@@ -1258,7 +1258,8 @@ function updateHistStats(){
   const ev=histLoad();
   const sigs=ev.filter(e=>e.type==='signal_t1'||e.type==='signal_t2');
   const opens=ev.filter(e=>e.type==='trade_open');
-  const closes=ev.filter(e=>e.type==='trade_close');
+  // trade_tp1 = TP1 hit (partial win) — counts as a closed trade
+  const closes=ev.filter(e=>e.type==='trade_close'||e.type==='trade_tp1');
   const wins=closes.filter(e=>e.outcome==='WIN'||e.outcome==='PARTIAL');
   document.getElementById('hStatSignals').textContent=sigs.length;
   document.getElementById('hStatTrades').textContent=opens.length;
@@ -1271,16 +1272,17 @@ function updateHistStats(){
 }
 
 function renderHistoryList(){
-  // For the monitor tab closed trades list
+  // For the monitor tab closed trades list — includes TP1 hits
   const el=document.getElementById('historyList');if(!el) return;
-  const closes=histLoad().filter(e=>e.type==='trade_close');
+  const closes=histLoad().filter(e=>e.type==='trade_close'||e.type==='trade_tp1');
   if(!closes.length){el.innerHTML='<div style="color:var(--text3);font-size:.75rem;text-align:center;padding:12px;">No closed trades yet.</div>';return;}
   el.innerHTML=closes.slice(0,20).map(t=>{
     const pc=parseFloat(t.rawPnl||0)>=0?'var(--bull2)':'var(--bear2)';
+    const outcomeLabel=t.outcome==='WIN'?'🏆 TP2':t.outcome==='PARTIAL'?'✅ TP1':t.outcome==='LOSS'?'🛑 SL':'✕ Manual';
     return`<div style="background:var(--bg3);border-left:2px solid ${pc};border-radius:5px;padding:6px 10px;margin-bottom:4px;font-size:.7rem;">
       <div style="display:flex;justify-content:space-between;">
-        <span style="color:${t.dir==='bull'?'var(--bull2)':'var(--bear2)'};font-weight:700;">${t.dir==='bull'?'▲ LONG':'▼ SHORT'}</span>
-        <span style="color:${pc};font-weight:700;">${parseFloat(t.rawPnl||0)>=0?'+':''}${t.rawPnl}% raw | ${t.outcome}</span>
+        <span style="color:${t.dir==='bull'?'var(--bull2)':'var(--bear2)'};font-weight:700;">${t.dir==='bull'?'▲ LONG':'▼ SHORT'} ${outcomeLabel}</span>
+        <span style="color:${pc};font-weight:700;">${parseFloat(t.rawPnl||0)>=0?'+':''}${t.rawPnl}% raw</span>
       </div>
       <div style="color:var(--text3);">$${parseFloat(t.entry||0).toFixed(4)} → $${parseFloat(t.exitPrice||0).toFixed(4)} · ${t.hoursOpen}h</div>
     </div>`;
@@ -1292,10 +1294,11 @@ function renderHistoryTab(){
   let ev=histLoad();
   if(filter==='signal') ev=ev.filter(e=>e.type==='signal_t1'||e.type==='signal_t2');
   if(filter==='trade')  ev=ev.filter(e=>e.type==='trade_open');
-  if(filter==='outcome')ev=ev.filter(e=>e.type==='trade_close');
+  // "Closed Trades" filter shows BOTH trade_close (TP2/SL/manual) AND trade_tp1 (TP1 partial)
+  if(filter==='outcome')ev=ev.filter(e=>e.type==='trade_close'||e.type==='trade_tp1');
   document.getElementById('histCount').textContent='— '+ev.length+' entries';
-  // Insights
-  const closes=histLoad().filter(e=>e.type==='trade_close');
+  // Insights — use all closed trade types
+  const closes=histLoad().filter(e=>e.type==='trade_close'||e.type==='trade_tp1');
   if(closes.length>=3){
     document.getElementById('histInsight').style.display='block';
     const wins=closes.filter(e=>e.outcome==='WIN'||e.outcome==='PARTIAL');
@@ -1316,12 +1319,30 @@ function renderHistoryTab(){
     const date=new Date(e.ts).toLocaleDateString('en-GB',{day:'2-digit',month:'short',year:'2-digit'});
     const time=new Date(e.ts).toLocaleTimeString('en-US',{hour12:false,hour:'2-digit',minute:'2-digit'});
     const dc=e.dir==='bull'?'var(--bull2)':e.dir==='bear'?'var(--bear2)':'var(--text2)';
-    const typeColors={signal_t1:'var(--amber)',signal_t2:'var(--bull2)',trade_open:'var(--blue2)',trade_close:parseFloat(e.rawPnl||0)>=0?'var(--bull2)':'var(--bear2)',trade_tp1:'var(--amber)'};
-    const bc=typeColors[e.type]||'var(--border)';
+    const typeColors={
+      signal_t1:'var(--amber)',
+      signal_t2:'var(--bull2)',
+      trade_open:'var(--blue2)',
+      trade_tp1:'var(--amber)',    // TP1 partial = amber
+      trade_close:e=>parseFloat(e.rawPnl||0)>=0?'var(--bull2)':'var(--bear2)',
+      exit_signal:'var(--bear2)',
+    };
+    const bc=typeof typeColors[e.type]==='function'?typeColors[e.type](e):(typeColors[e.type]||'var(--border)');
     let body='';
-    if(e.type==='signal_t1'||e.type==='signal_t2'){body=`<div style="margin-top:4px;font-size:.68rem;color:var(--text2);">Dir: <span style="color:${dc};font-weight:700;">${(e.dir||'').toUpperCase()}</span> · Price: $${parseFloat(e.price||0).toFixed(4)} · 1D J: ${e.d1J||'—'}</div>`;}
-    else if(e.type==='trade_open'){body=`<div style="margin-top:4px;font-size:.68rem;color:var(--text2);">Entry: $${parseFloat(e.entry||0).toFixed(4)} · TP2: $${parseFloat(e.tp2||0).toFixed(4)} · SL: $${parseFloat(e.sl||0).toFixed(4)}</div>`;}
-    else if(e.type==='trade_close'||e.type==='trade_tp1'){const pc=parseFloat(e.rawPnl||0)>=0?'var(--bull2)':'var(--bear2)';body=`<div style="margin-top:4px;font-size:.68rem;">$${parseFloat(e.entry||0).toFixed(4)}→$${parseFloat(e.exitPrice||0).toFixed(4)} · <span style="color:${pc};font-weight:700;">${parseFloat(e.rawPnl||0)>=0?'+':''}${e.rawPnl}% raw</span> · ${e.hoursOpen}h</div>`;}
+    if(e.type==='signal_t1'||e.type==='signal_t2'){
+      body=`<div style="margin-top:4px;font-size:.68rem;color:var(--text2);">Dir: <span style="color:${dc};font-weight:700;">${(e.dir||'').toUpperCase()}</span> · Price: $${parseFloat(e.price||0).toFixed(4)} · 1D J: ${e.d1J||'—'}</div>`;
+    } else if(e.type==='trade_open'){
+      body=`<div style="margin-top:4px;font-size:.68rem;color:var(--text2);">Entry: $${parseFloat(e.entry||0).toFixed(4)} · TP1: $${parseFloat(e.tp1||0).toFixed(4)} · TP2: $${parseFloat(e.tp2||0).toFixed(4)} · SL: $${parseFloat(e.sl||0).toFixed(4)}</div>`;
+    } else if(e.type==='trade_close'||e.type==='trade_tp1'){
+      const pc=parseFloat(e.rawPnl||0)>=0?'var(--bull2)':'var(--bear2)';
+      const outcomeLabel=e.outcome==='WIN'?'🏆 TP2 Full':e.outcome==='PARTIAL'?'✅ TP1 Hit':e.outcome==='LOSS'?'🛑 SL Hit':'✕ Manual';
+      body=`<div style="margin-top:4px;font-size:.68rem;">
+        <span style="color:${pc};font-weight:700;">${outcomeLabel}</span> ·
+        $${parseFloat(e.entry||0).toFixed(4)} → $${parseFloat(e.exitPrice||0).toFixed(4)} ·
+        <span style="color:${pc};font-weight:700;">${parseFloat(e.rawPnl||0)>=0?'+':''}${e.rawPnl}% raw</span> ·
+        ${e.hoursOpen}h open
+      </div>`;
+    }
     return`<div style="background:var(--bg2);border:1px solid var(--border);border-left:3px solid ${bc};border-radius:6px;padding:9px 12px;">
       <div style="display:flex;justify-content:space-between;align-items:center;">
         <span style="font-size:.72rem;font-weight:700;color:${bc};">${e.label||e.type}</span>
