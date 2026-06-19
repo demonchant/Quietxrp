@@ -879,11 +879,78 @@ async function analyzeFutures(symbols){
 }
 
 // ══════════════════════════════════════════════════════════
-// SCORING ENGINE — 10 POINTS
-// 7 technical (KDJ·MACD·EMA·Volume) + 3 futures
+// SCORING ENGINE — 11 POINTS
+// 8 technical (KDJ·MACD·EMA·1H-Trend·Volume) + 3 futures
+// Threshold stays at 7 — harder to reach without trend alignment
 // ══════════════════════════════════════════════════════════
-function scoreSignal(assetData,btcData,bias,futuresData){
+function scoreSignal(assetData,btcData,bias,futuresData,trendFollow){
   let score=0;const chips=[];
+
+  // ══════════════════════════════════════════════════════
+  // TREND-FOLLOWING SHORT PATH
+  // The checks below this block (3D/1D/4H KDJ extremes, EMA-above-price)
+  // are mean-reversion checks and don't apply to a trend-following short,
+  // which deliberately enters on a MID-RANGE 4H J bounce into resistance,
+  // not an overbought extreme. Score this setup on trend/structure
+  // confirmation instead, skipping the mean-reversion veto entirely
+  // (there is no "exhaustion" zone to protect here — we WANT continuation).
+  // ══════════════════════════════════════════════════════
+  if(trendFollow){
+    const h1=assetData['1H'],h4=assetData['4H'],d1=assetData['1D'];
+    const price=assetData.price;
+
+    // 1. 1H trend structure down
+    const cond1=h1.ema21<h1.ema99;
+    cond1?score++:null;chips.push({label:'1H Trend Down',pass:cond1});
+
+    // 2. 4H trend structure down
+    const cond2=h4.ema20<h4.ema50;
+    cond2?score++:null;chips.push({label:'4H Trend Down',pass:cond2});
+
+    // 3. Macro (1D) trend down
+    const cond3=d1&&d1.ema50!=null?price<d1.ema50:price<h4.ema50;
+    cond3?score++:null;chips.push({label:'1D Trend Down',pass:cond3});
+
+    // 4. 4H MACD not turning bullish
+    const cond4=h4.macdHist<0.0005;
+    cond4?score++:null;chips.push({label:'4H MACD',pass:cond4});
+
+    // 5. Bounce into resistance (near 4H EMA20, not yet rejected)
+    const cond5=Math.abs(price-h4.ema20)/h4.ema20<0.015;
+    cond5?score++:null;chips.push({label:'Bounce Zone',pass:cond5});
+
+    // 6. 1H momentum stalling (not still accelerating up)
+    const cond6=h1.macdHist<=0||h1.volLast<=h1.volPrev;
+    cond6?score++:null;chips.push({label:'1H Momentum Stall',pass:cond6});
+
+    // 7. Volume confirmation
+    const volHigh=h4.volHigh;
+    volHigh?score++:null;chips.push({label:'Volume',pass:volHigh});
+
+    // Futures (3 pts) — same as mean-reversion path
+    if(futuresData){
+      const fr=futuresData.fundingRate;
+      let frPass=false,frWarn=false;
+      if(fr!==null){frPass=fr>0;frWarn=fr<-0.01;}
+      frPass?score++:null;chips.push({label:'Funding',pass:frPass,warn:frWarn,futures:true});
+
+      const oiD=futuresData.oiDelta;
+      const oiPass=oiD!==null&&oiD>2;
+      oiPass?score++:null;chips.push({label:'OI Δ',pass:oiPass,warn:oiD!==null&&oiD>0,futures:true});
+
+      const ll=futuresData.longLiqTotal,sl=futuresData.shortLiqTotal;
+      const total=ll+sl;
+      let liqPass=false;
+      if(total>0){const shortLiqPct=sl/total;liqPass=shortLiqPct<0.45;}
+      liqPass?score++:null;chips.push({label:'Liq Cluster',pass:liqPass,futures:true});
+    } else {
+      chips.push({label:'Funding',pass:false,warn:true,futures:true});
+      chips.push({label:'OI Δ',pass:false,warn:true,futures:true});
+      chips.push({label:'Liq Cluster',pass:false,warn:true,futures:true});
+    }
+
+    return {score,chips,vetoed:false,trendFollow:true};
+  }
 
   // ══════════════════════════════════════════════════════
   // TREND-CONTINUATION VETO
@@ -928,10 +995,14 @@ function scoreSignal(assetData,btcData,bias,futuresData){
     if(h1.volLast>h1.volPrev) breakoutVotes++;
   }
   // Higher-TF extreme zone bypass: if macro or entry TF is deeply
-  // oversold (long) or overbought (short), skip the veto entirely.
+  // oversold (long) or overbought (short), skip the veto entirely —
+  // UNLESS price is in a structural falling knife (3D J < 20 AND
+  // price below all EMAs), in which case oversold means MORE downside,
+  // not a reversal. Keep veto eligible in that case.
   let vetoEligible=false;
   if(bias==='long'){
-    vetoEligible=a3dJ_veto>40&&a4hJ_veto>35;
+    const fallingKnife=a3dJ_veto<20&&assetData['4H']&&assetData.price<assetData['4H'].ema50;
+    vetoEligible=(a3dJ_veto>40&&a4hJ_veto>35)||fallingKnife;
   } else if(bias==='short'){
     vetoEligible=a3dJ_veto<60&&a4hJ_veto<65;
   }
@@ -967,12 +1038,22 @@ function scoreSignal(assetData,btcData,bias,futuresData){
   const condMACD=bias==='long'?macd4h>-0.0005:macd4h<0.0005;
   condMACD?score++:null;chips.push({label:'4H MACD',pass:condMACD,warn:false});
 
-  // 5. EMA price structure (4H)
+  // 5. EMA price structure (4H) + trend alignment
   const assetPrice=assetData.price;
   const ema20=assetData['4H'].ema20;
   const ema50=assetData['4H'].ema50;
   const condEMA=bias==='long'?assetPrice<ema20:assetPrice>ema20;
   condEMA?score++:null;chips.push({label:'4H EMA',pass:condEMA,warn:Math.abs(assetPrice-ema20)/ema20<0.005});
+
+  // 5b. 1H EMA structure — price must be above EMA21 on 1H for LONG
+  // (confirms at least short-term momentum turning, not just oversold)
+  const h1ema21=assetData['1H']?.ema21;
+  const h1ema99=assetData['1H']?.ema99;
+  const condTrend = bias==='long'
+    ? (h1ema21&&h1ema99&&h1ema21>h1ema99*0.998) // 1H EMA21 at least close to EMA99 (not deep downtrend)
+    : (h1ema21&&h1ema99&&h1ema21<h1ema99*1.002);
+  if(condTrend) score++;
+  chips.push({label:'1H Trend',pass:!!condTrend,warn:false});
 
   // 6. BTC regime alignment (replaces old BTC 4H KDJ only)
   const regimeAligned=(bias==='long'&&globalRegime==='bull')||(bias==='short'&&globalRegime==='bear');
@@ -1020,14 +1101,68 @@ function scoreSignal(assetData,btcData,bias,futuresData){
 // ══════════════════════════════════════════════════════════
 // BIAS FROM 3D (asset + BTC)
 // ══════════════════════════════════════════════════════════
-function getAssetBias(asset3dJ,btc3dJ,regime){
+function getAssetBias(asset3dJ,btc3dJ,regime,assetData){
+  // ── DOWNTREND STRUCTURE GUARD ────────────────────────────────────────
+  // If the coin is in a clear structural downtrend on higher timeframes,
+  // block LONG bias entirely — oversold KDJ in a downtrend just means
+  // the coin keeps falling (exactly what happened with AVAX).
+  // A structural downtrend is confirmed when ALL of:
+  //   · 1H EMA21 < EMA99  (short-term below long-term = downtrend)
+  //   · Price < 4H EMA50  (price below mid-term trend)
+  //   · 3D J < 20         (macro deeply oversold = exhaustion, not reversal)
+  // In that case we flip to SHORT (mean-reversion from a dead cat bounce)
+  // or NEUTRAL (if short signals are also weak).
+  if(assetData){
+    const h1=assetData['1H'];
+    const h4=assetData['4H'];
+    const price=assetData.price;
+    const ema50_4h=h4?.ema50;
+
+    const fallingKnife=
+      h1&&h1.ema21&&h1.ema99&&h1.ema21<h1.ema99 &&  // 1H downtrend
+      ema50_4h&&price<ema50_4h &&                     // price below 4H EMA50
+      asset3dJ<20;                                    // deeply oversold on 3D = falling knife
+    if(fallingKnife) return'short';
+
+    // ── TREND-FOLLOWING SHORT TRIGGER ──────────────────────────────────
+    // The mean-reversion short (3D J > 60) almost never fires because 3D
+    // candles take weeks to form — coins rarely stay overbought that long
+    // on a 3-day chart. This left the system practically long-only.
+    //
+    // This trigger instead detects a STRUCTURAL DOWNTREND (looser than the
+    // falling-knife case above) and shorts the bounce: price pulling back
+    // up toward 4H EMA20/50 inside a confirmed downtrend, rather than
+    // waiting for 3D overbought which rarely happens in a downtrend anyway.
+    //
+    // Structural downtrend confirmed when ALL of:
+    //   · 1H EMA21 < EMA99            (short-term trend is down)
+    //   · 4H EMA20 < EMA50            (mid-term trend is down)
+    //   · price < 1D EMA50 (or 4H if 1D unavailable) (macro trend is down)
+    // Bounce condition (entry timing):
+    //   · 4H J between 35–65 (not already oversold — leaves room to fall)
+    //   · price within 1.5% of 4H EMA20 (the "bounce into resistance" zone)
+    const ema20_4h=h4?.ema20;
+    const d1=assetData['1D'];
+    const macroDown = d1&&d1.ema50!=null ? price<d1.ema50 : (ema50_4h!=null&&price<ema50_4h);
+
+    const trendStructureDown=
+      h1&&h1.ema21&&h1.ema99&&h1.ema21<h1.ema99 &&
+      h4&&ema20_4h&&ema50_4h&&ema20_4h<ema50_4h &&
+      macroDown;
+
+    if(trendStructureDown&&ema20_4h){
+      const h4J=h4.J;
+      const nearResistance=Math.abs(price-ema20_4h)/ema20_4h<0.015;
+      const notAlreadyOversold=h4J>=35&&h4J<=65;
+      if(nearResistance&&notAlreadyOversold) return'short';
+    }
+  }
+
   // If regime is set, force direction
   if(regime==='bull'){
-    if(asset3dJ<50)return'long';
     return'long'; // bull regime = only longs
   }
   if(regime==='bear'){
-    if(asset3dJ>50)return'short';
     return'short'; // bear regime = only shorts
   }
   // Sideways: use asset 3D KDJ
@@ -1570,23 +1705,45 @@ async function runAnalysis(){
       const ema21_15m=calcEMA(k15m,21),ema50_15m=calcEMA(k15m,50);
       const vol4h=analyzeVolume(k4h);
 
+      const ema50_1d = calcEMA(k1d,50);
+
       const assetData={
         price:assetPrice,
         '3D':{K:last(kdj['3D'].K),D:last(kdj['3D'].D),J:last(kdj['3D'].J),cross:detectCross(kdj['3D'].K,kdj['3D'].D,kdj['3D'].J)},
-        '1D':{K:last(kdj['1D'].K),D:last(kdj['1D'].D),J:last(kdj['1D'].J),cross:detectCross(kdj['1D'].K,kdj['1D'].D,kdj['1D'].J)},
+        '1D':{K:last(kdj['1D'].K),D:last(kdj['1D'].D),J:last(kdj['1D'].J),cross:detectCross(kdj['1D'].K,kdj['1D'].D,kdj['1D'].J),ema50:ema50_1d},
         '4H':{K:last(kdj['4H'].K),D:last(kdj['4H'].D),J:last(kdj['4H'].J),cross:detectCross(kdj['4H'].K,kdj['4H'].D,kdj['4H'].J),macdHist:last(macd4h.hist),macdDif:last(macd4h.dif),ema20:ema20_4h,ema50:ema50_4h,ema21:ema20_4h,volHigh:vol4h.high,volRising:vol4h.rising},
         '1H':{K:last(kdj['1H'].K),D:last(kdj['1H'].D),J:last(kdj['1H'].J),cross:detectCross(kdj['1H'].K,kdj['1H'].D,kdj['1H'].J),macdHist:last(macd1h.hist),macdDif:last(macd1h.dif),ema21:ema21_1h,ema50:ema50_1h,ema99:ema99_1h,volLast:vol1hLast,volPrev:vol1hPrev},
         '15M':{K:last(kdj['15M'].K),D:last(kdj['15M'].D),J:last(kdj['15M'].J),cross:detectCross(kdj['15M'].K,kdj['15M'].D,kdj['15M'].J),macdHist:last(macd15m.hist),macdDif:last(macd15m.dif),ema21:ema21_15m,ema50:ema50_15m},
       };
 
-      const bias=getAssetBias(assetData['3D'].J,btcData['3D'].J,globalRegime);
+      const bias=getAssetBias(assetData['3D'].J,btcData['3D'].J,globalRegime,assetData);
+
+      // Determine if this short was triggered by the trend-following path
+      // (vs. mean-reversion 3D-overbought path) so scoreSignal knows which
+      // scoring rules to apply. Recomputes the same structural check used
+      // inside getAssetBias — cheap, and keeps getAssetBias's return type
+      // simple (just a string) for backward compatibility.
+      let trendFollowShort=false;
+      if(bias==='short'){
+        const h1=assetData['1H'],h4=assetData['4H'],d1=assetData['1D'];
+        const price=assetData.price;
+        const ema50_4h=h4?.ema50,ema20_4h=h4?.ema20;
+        const fallingKnife=h1&&h1.ema21&&h1.ema99&&h1.ema21<h1.ema99&&ema50_4h&&price<ema50_4h&&assetData['3D'].J<20;
+        const macroDown=d1&&d1.ema50!=null?price<d1.ema50:(ema50_4h!=null&&price<ema50_4h);
+        const trendStructureDown=h1&&h1.ema21&&h1.ema99&&h1.ema21<h1.ema99&&h4&&ema20_4h&&ema50_4h&&ema20_4h<ema50_4h&&macroDown;
+        // It's trend-following (not mean-reversion) if structure-down fired
+        // and it wasn't the extreme falling-knife case, and 3D J isn't
+        // already in classic overbought-short territory.
+        trendFollowShort = trendStructureDown && !fallingKnife && assetData['3D'].J<=60;
+      }
+
       let score=0,chips=[];
       if(bias!=='neutral'){
-        const res=scoreSignal(assetData,btcData,bias,futuresCache[sym]);
+        const res=scoreSignal(assetData,btcData,bias,futuresCache[sym],trendFollowShort);
         score=res.score;chips=res.chips;
       }
 
-      assetCache[sym]={assetData,btcData,bias,score,chips};
+      assetCache[sym]={assetData,btcData,bias,score,chips,trendFollowShort};
 
       // Check for KDJ cross alerts
       ['3D','1D','4H','1H'].forEach(tf=>{
